@@ -1,13 +1,13 @@
 #pragma once
 
 #include "matrix.h"
-#include "layer.h"
+#include "fc_layer.h"
 
 struct Network;
 
-struct Network *createNetwork(struct Layer **layers, int n_layers, int batch_size);
+struct Network *createNetwork(struct FCLayer **layers, int n_layers, int batch_size, float lr, float momentum);
 
-int resetNetworkToTrain(struct Network *net, int batch_size);
+int resetNetworkToTrain(struct Network *net, int batch_size, float lr, float momentum);
  
 int forwardNetwork(struct Network *net, const struct Matrix *input);
 
