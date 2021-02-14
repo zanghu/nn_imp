@@ -63,7 +63,7 @@ int createNetwork(struct Network **network, struct Layer **layers, int n_layers,
     CHK_NIL_GOTO((net->deltas = calloc(n_layers, sizeof(struct Tensor *))));
     CHK_NIL_GOTO((net->outputs = calloc(n_layers, sizeof(struct Tensor *))));
 
-    for (i = 0; i < n_layers - 1; ++i) {
+    for (i = 0; i < n_layers; ++i) {
         int n_out = 0;
         CHK_ERR_GOTO(getLayerOutputNumber(&n_out, net->layers[i]));
         CHK_ERR_GOTO(createTensor(&(net->deltas[i]), args->batch_size, n_out, 1, 1));

@@ -35,7 +35,7 @@ int createLinearLayer(struct LinearLayer **l, int n_in, int n_out)
     ((struct Layer *)layer)->type = LINEAR_LAYER_TYPE;
 
     // Weight
-    CHK_ERR_GOTO(createTensor(&(layer->w), 1, n_in, n_out, 1)); // n_inputs * n_outputs，布局与yolov2保持一致
+    CHK_ERR_GOTO(createTensor(&(layer->w), 1, n_out, n_in, 1)); // outputs * inputs，布局与yolov2保持一致
     initTensorParameterAsWeight(layer->w);
 
     // Bias
@@ -43,7 +43,7 @@ int createLinearLayer(struct LinearLayer **l, int n_in, int n_out)
     initTensorParameterAsBias(layer->b);
 
     // Weight Gradient
-    CHK_ERR_GOTO(createTensor(&(layer->w_grad), 1, n_in, n_out, 1)); // n_inputs * n_outputs，布局与yolov2保持一致
+    CHK_ERR_GOTO(createTensor(&(layer->w_grad), 1,n_out,  n_in, 1)); // outputs * inputs，布局与yolov2保持一致
 
     // Bias Gradient
     CHK_ERR_GOTO(createTensor(&(layer->b_grad), 1, 1, n_out, 1));
@@ -53,10 +53,10 @@ int createLinearLayer(struct LinearLayer **l, int n_in, int n_out)
 
 err_end:
     if (layer) {
-        free(layer->b_grad);
-        free(layer->w_grad);
-        free(layer->b);
-        free(layer->w);
+        destroyTensor(layer->b_grad);
+        destroyTensor(layer->w_grad);
+        destroyTensor(layer->b);
+        destroyTensor(layer->w);
     }
     free(layer);
     return ERR_COD;
@@ -65,10 +65,10 @@ err_end:
 void destroyLinearLayer(struct LinearLayer *layer)
 {
     if (layer) {
-        free(layer->b_grad);
-        free(layer->w_grad);
-        free(layer->b);
-        free(layer->w);
+        destroyTensor(layer->b_grad);
+        destroyTensor(layer->w_grad);
+        destroyTensor(layer->b);
+        destroyTensor(layer->w);
     }
     free(layer);
 }
