@@ -1,20 +1,38 @@
 #pragma once
 
-#include "matrix.h"
+#include "tensor.h"
+#include "opt_alg.h"
 
-struct Layer;
+enum LayerType
+{
+    UNKNOW_LAYER_TYPE,
+    LINEAR_LAYER_TYPE,
+    SIGMOID_LAYER_TYPE,
+    SOFTMAX_LAYER_TYPE
+};
 
-struct Layer *createLayer(int n_in, int n_out);
+struct Layer
+{
+    enum LayerType type;
 
-void destroyLayer(struct Layer *layer);
+    // ref only, memory not own 
+    struct Tensor *input;
+    struct Tensor *output;
+    struct Tensor *delta_in;
+    struct Tensor *delta_out;
 
-int getLayerInputNeuronNumber(const struct Layer *layer);
+    //float lr;
+    //float momentum;
+};
 
-int getLayerOutputNeuronNumber(const struct Layer *layer);
+int forwardLayer(struct Layer *layer);
+int backwardLayer(struct Layer *layer);
+int updateLayer(struct Layer *layer, const struct UpdateArgs *args);
 
-int forwardLayer(struct Matrix *output, struct Matrix *hidden, const struct Layer *layer, const struct Matrix *input);
+int getLayerInputNumber(int *n_in, const struct Layer *layer);
+int getLayerOutputNumber(int *n_out, const struct Layer *layer);
 
-int backwardLayer(struct Matrix *delta_new, const struct Matrix *output, const struct Layer *layer, const struct Matrix *delta);
-
-int updateLayer(struct Layer *layer);
-
+int setLayerInput(struct Layer *layer, const struct Tensor *input);
+int setLayerOutput(struct Layer *layer, const struct Tensor *output);
+int setLayerInputDelta(struct Layer *layer, const struct Tensor *delta_in);
+int setLayerOutputDelta(struct Layer *layer, const struct Tensor *delta_out);

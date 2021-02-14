@@ -1,0 +1,6 @@
+1.github上基于theano的集中基础网络教程和示范代码
+https://github.com/Newmu/Theano-Tutorials
+
+2.残存的theano教程，带有逻辑回归的python代码
+Deep Learning with Theano - Part 1: Logistic Regression
+https://www.quantstart.com/articles/Deep-Learning-with-Theano-Part-1-Logistic-Regression/

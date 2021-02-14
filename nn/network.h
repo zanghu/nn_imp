@@ -1,16 +1,15 @@
 #pragma once
 
-#include "matrix.h"
-#include "fc_layer.h"
+#include "tensor.h"
+#include "layer.h"
+#include "cost.h"
+#include "opt_alg.h"
 
 struct Network;
 
-struct Network *createNetwork(struct FCLayer **layers, int n_layers, int batch_size, float lr, float momentum);
+int createNetwork(struct Network **network, struct Layer **layers, int n_layers, struct Cost *cost, const struct UpdateArgs *args);
+void destroyNetwork(struct Network *net);
 
-int resetNetworkToTrain(struct Network *net, int batch_size, float lr, float momentum);
- 
-int forwardNetwork(struct Network *net, const struct Matrix *input);
-
-int backwardNetwork(struct Network *net, const struct Matrix *delta);
-
+int forwardNetwork(struct Network *net, const struct Tensor *input);
+int backwardNetwork(struct Network *net, const struct Tensor *gt);
 int updateNetwork(struct Network *net);

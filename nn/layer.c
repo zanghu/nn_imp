@@ -1,117 +1,233 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "debug_macros.h"
-#include "math_utils.h"
-#include "matrix.h"
+#include "tensor.h"
+#include "layer.h"
+#include "linear_layer.h"
+#include "sigmoid_layer.h"
+#include "softmax_layer.h"
+#include "opt_alg.h"
 
-
-
-struct Layer {
-    struct Matrix *w;
-    struct Matrix *b;
-    struct Matrix *w_grad;
-    struct Matrix *b_grad;
-    int (*f)(struct Matrix *, struct Matrix *);
-};
-
-struct Layer *createLayer(int n_in, int n_out)
+/*
+struct Layer
 {
-    if (n_in <= 0) return NULL;
-    if (n_in <= 0) return NULL;
+    enum LayerType type;
 
-    struct Layer *layer = calloc(1, sizeof(struct Layer));
-    if (layer == NULL) {
-        ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
-        return NULL;
+    // ref only, memory not own 
+    struct Tensor *input;
+    struct Tensor *output;
+    struct Tensor *delta_in;
+    struct Tensor *delta_out;
+};
+*/
+
+char *getLayerTypeStrFromEnum(enum LayerType type)
+{
+    switch(type) {
+        case LINEAR_LAYER_TYPE:
+        return "linear_layer";
+
+        case SIGMOID_LAYER_TYPE:
+        return "sigmoid_layer";
+
+        case SOFTMAX_LAYER_TYPE:
+        return "softmax_layer";
+
+        default:
+        break;
     }
-
-    layer->w = createMatrix(1, n_in, n_out, 1);
-    if (layer->w == NULL) {
-        ERR_MSG("createMatrix() failed, error.\n");
-        goto err_end;
-    }
-    initMatrixParameterAsWeight(layer->w);
-
-    layer->b = createMatrix(1, 1, n_out, 1);
-    if (layer->w == NULL) {
-        ERR_MSG("createMatrix() failed, error.\n");
-        goto err_end;
-    }
-    initMatrixParameterAsBias(layer->b);
-
-    layer->w_grad = createMatrix(1, n_in, n_out, 1);
-    if (layer->w_grad == NULL) {
-        ERR_MSG("createMatrix() failed, error.\n");
-        goto err_end;
-    }
-
-    layer->b_grad = createMatrix(1, 1, n_out, 1);
-    if (layer->b_grad == NULL) {
-        ERR_MSG("createMatrix() failed, error.\n");
-        goto err_end;
-    }
-
-    return layer;
-
-err_end:
-    if (layer) {
-        free(layer->b_grad);
-        free(layer->w_grad);
-        free(layer->b);
-        free(layer->w);
-    }
-    free(layer);
-    return NULL;
+    return "unknow_layer";
 }
 
+/*
 void destroyLayer(struct Layer *layer)
 {
-    if (layer) {
-        free(layer->b_grad);
-        free(layer->w_grad);
-        free(layer->b);
-        free(layer->w);
+    if (layer == NULL) return;
+    switch (layer->type) {
+        case LINEAR_LAYER_TYPE:
+        destroyLinearLayer((struct LinearLayer **)layer, n_in, n_out);
+        break;
+
+        case SIGMOID_LAYER_TYPE:
+        destroySigmoidLayer((struct SigmoidLayer **)layer, n_in, n_out);
+        break;
+
+        case SOFTMAX_LAYER_TYPE:
+        destroySoftmaxLayer((struct SoftmaxLayer **)layer, n_in, n_out);
+        break;
+
+        default:
+        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
+        break; // TODO: 此处未抛出异常
     }
-    free(layer);
 }
+*/
 
-int getLayerInputNeuronNumber(const struct Layer *layer)
+int forwardLayer(struct Layer *layer)
 {
     CHK_NIL(layer);
-    return getMatrixCol(layer->w);
+
+    switch (layer->type) {
+        case LINEAR_LAYER_TYPE:
+        CHK_ERR(forwardLinearLayer((struct LinearLayer *)layer));
+        break;
+
+        case SIGMOID_LAYER_TYPE:
+        CHK_ERR(forwardSigmoidLayer((struct SigmoidLayer *)layer));
+        break;
+
+        case SOFTMAX_LAYER_TYPE:
+        CHK_ERR(forwardSoftmaxLayer((struct SoftmaxLayer *)layer));
+        break;
+
+        default:
+        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
+        return ERR_COD;
+    }
+    return SUCCESS;
 }
 
-int getLayerOutputNeuronNumber(const struct Layer *layer)
+int backwardLayer(struct Layer *layer)
 {
     CHK_NIL(layer);
-    return getMatrixRow(layer->w);
+
+    switch (layer->type) {
+        case LINEAR_LAYER_TYPE:
+        CHK_ERR(backwardLinearLayer((struct LinearLayer *)layer));
+        break;
+
+        case SIGMOID_LAYER_TYPE:
+        CHK_ERR(backwardSigmoidLayer((struct SigmoidLayer *)layer));
+        break;
+
+        case SOFTMAX_LAYER_TYPE:
+        CHK_ERR(backwardSoftmaxLayer((struct SoftmaxLayer *)layer));
+        break;
+
+        default:
+        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
+        return ERR_COD;
+    }
+    return SUCCESS;
 }
 
-int forwardLayer(struct Matrix *output, struct Matrix *hidden, const struct Layer *layer, const struct Matrix *input)
+int updateLayer(struct Layer *layer, const struct UpdateArgs *args)
 {
-    CHK_NIL(output);
-    CHK_NIL(hidden);
+    CHK_NIL(layer);
+
+    switch (layer->type) {
+        case LINEAR_LAYER_TYPE:
+        CHK_ERR(updateLinearLayer((struct LinearLayer *)layer, args));
+        break;
+
+        case SIGMOID_LAYER_TYPE:
+        ERR_MSG("NotImplementedError, SigmoidLayer has no update method, error.\n");
+        return ERR_COD;
+
+        case SOFTMAX_LAYER_TYPE:
+        ERR_MSG("NotImplementedError, SoftmaxLayer has no update method, error.\n");
+        break;
+
+        default:
+        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
+int getLayerInputNumber(int *n_in, const struct Layer *layer)
+{
+    CHK_NIL(n_in);
+    CHK_NIL(layer);
+
+    switch (layer->type) {
+        case LINEAR_LAYER_TYPE:
+        CHK_ERR(getLinearLayerInputNumber(n_in, (const struct LinearLayer *)layer));
+        break;
+
+        case SIGMOID_LAYER_TYPE:
+        CHK_ERR(getSigmoidLayerInputNumber(n_in, (const struct SigmoidLayer *)layer));
+        break;
+
+        case SOFTMAX_LAYER_TYPE:
+        CHK_ERR(getSoftmaxLayerInputNumber(n_in, (const struct SoftmaxLayer *)layer));
+        break;
+
+        default:
+        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
+int getLayerOutputNumber(int *n_out, const struct Layer *layer)
+{
+    CHK_NIL(n_out);
+    CHK_NIL(layer);
+
+    switch (layer->type) {
+        case LINEAR_LAYER_TYPE:
+        CHK_ERR(getLinearLayerOutputNumber(n_out, (struct LinearLayer *)layer));
+        break;
+
+        case SIGMOID_LAYER_TYPE:
+        CHK_ERR(getSigmoidLayerOutputNumber(n_out, (struct SigmoidLayer *)layer));
+        break;
+
+        case SOFTMAX_LAYER_TYPE:
+        CHK_ERR(getSoftmaxLayerOutputNumber(n_out, (struct SoftmaxLayer *)layer));
+        break;
+
+        default:
+        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
+
+int setLayerInput(struct Layer *layer, const struct Tensor *input)
+{
     CHK_NIL(layer);
     CHK_NIL(input);
 
-    CHK_ERR(linearMatrix(hidden, layer->w, input, layer->b));
-    CHK_ERR(activateMatrix(output, hidden, "logistic"));
-
+    layer->input = (struct Tensor *)input;
     return SUCCESS;
 }
-
-int backwardLayer(struct Matrix *delta_new, const struct Matrix *output, const struct Layer *layer, const struct Matrix *delta)
+    
+int setLayerOutput(struct Layer *layer, const struct Tensor *output)
 {
-    CHK_NIL(delta_new);
-    CHK_NIL(output);
     CHK_NIL(layer);
-    CHK_NIL(delta);
+    CHK_NIL(output);
 
-    CHK_ERR(deactivateMatrix(delta_new, output, delta, "logistic"));
-    CHK_ERR(linearMatrix(delta_new, layer->w, delta, layer->b));
-
+    layer->output = (struct Tensor *)output;
     return SUCCESS;
 }
 
+int setLayerInputDelta(struct Layer *layer, const struct Tensor *delta_in)
+{
+    CHK_NIL(layer);
+    CHK_NIL(delta_in);
+
+    layer->delta_in = (struct Tensor *)delta_in;
+    return SUCCESS;
+}
+
+int setLayerOutputDelta(struct Layer *layer, const struct Tensor *delta_out)
+{
+    CHK_NIL(layer);
+    CHK_NIL(delta_out);
+
+    layer->delta_out = (struct Tensor *)delta_out;
+    return SUCCESS;
+}
+
+/*
+int setLayerOptAlgArgs(struct Layer *layer, float lr, float momentum)
+{
+    CHK_NIL(layer);
+
+    layer->lr = lr;
+    layer->momentum = momentum;
+
+    return SUCCESS;
+}
+*/

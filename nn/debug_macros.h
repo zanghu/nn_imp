@@ -77,4 +77,33 @@ do { \
     } \
 } while (0)
 
+// 2.3.专门为goto处理异常准备的
+
+// 支持附加错误码的CHECK_NULL，返回自定义错误码
+#define CHK_NIL_GOTO(val) \
+do { \
+    if ((val) == NULL) { \
+        ERR_MSG("Null ptr var %s is found, error.\n", #val); \
+        goto err_end; \
+    } \
+} while (0)
+
+// 支持附加错误码的CHECK_NOT_NULL，返回自定义错误码
+#define CHK_NOT_NIL_GOTO(val) \
+do { \
+    if ((!(val)) == 0) { \
+        ERR_MSG("Not Null ptr var: %s found, error.\n", #val); \
+        goto err_end; \
+    } \
+} while (0)
+
+// 带返回错误码的CHECK_ERROR
+#define CHK_ERR_GOTO(val) \
+do { \
+    int _tmp_val_res = (val); \
+    if (_tmp_val_res != 0) { \
+        ERR_MSG("catch err: %d from %s, error.\n", _tmp_val_res, #val); \
+        goto err_end; \
+    } \
+} while (0)
 

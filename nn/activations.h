@@ -2,7 +2,8 @@
 
 #include <math.h>
 
-typedef enum ActivationType{
+typedef enum ActivationType
+{
     LOGISTIC, 
     RELU, 
     RELIE, 
