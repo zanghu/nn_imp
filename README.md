@@ -1,8 +1,8 @@
-# nn_imp
+# Neural Network
 
 C语言实现的神经网络（Neural Network）
 
-# 计划
+## 计划
 
 第1阶段：
 实现 MLP、CONV、GAN、LSTM 等基本模型
