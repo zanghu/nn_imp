@@ -54,7 +54,7 @@ int main()
 
     struct timeval t_train_0, t_train_1, t_train_2;
     CHK_ERR(gettimeofday(&t_train_0, NULL));
-    int n_epochs = 0;
+    int n_epochs = 1000;
     for (int k = 0; k < n_epochs; ++k) {
         int n_iters = 0;
         const void *data = NULL;
@@ -66,6 +66,7 @@ int main()
             // 获取batch数据
             CHK_ERR(getMnistNthBatch((const unsigned char *(*))(&data), NULL, (const unsigned char *(*))(&label_onehot), &n_samples, "train", &dataset, n_train, args.batch_size, n_iters));
             if (data == NULL) { // 训练集全部使用了一轮, 当前epoch结束
+                fprintf(stdout, "n_iters = %d, data is NULL\n", n_iters);
                 break;
             }
             CHK_ERR(setTensorData(input, data, UINT8, n_samples));
@@ -77,6 +78,7 @@ int main()
             CHK_ERR(updateNetwork(net));
 
             ++n_iters;
+            break;
         }
         CHK_ERR(gettimeofday(&t_epoch_1, NULL));
         timersub(&t_epoch_1, &t_epoch_0, &t_epoch_2);

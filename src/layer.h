@@ -31,7 +31,7 @@ int updateLayer(struct Layer *layer, const struct UpdateArgs *args);
 
 int getLayerInputNumber(int *n_in, const struct Layer *layer);
 int getLayerOutputNumber(int *n_out, const struct Layer *layer);
-int getLayerInputShape(int *b, int *row, int *col, int *c, const struct Layer *layer);
+int getLayerShape(int *n_in, int *n_out, const struct Layer *layer);
 
 int setLayerInput(struct Layer *layer, const struct Tensor *input);
 int setLayerOutput(struct Layer *layer, const struct Tensor *output);

@@ -173,7 +173,7 @@ int getMnistNthBatch(const unsigned char *(*data), const unsigned char *(*label)
     }
     if (label_onehot) {
         int offset_label = batch_idx * batch_size * MNIST_N_CLASSES; // 注意: onehot类标中头部没有偏移量MNIST_LABEL_OFFSET
-        *label = label_onehot_all + offset_label;
+        *label_onehot = label_onehot_all + offset_label;
     }
     if ((batch_idx + 1) * batch_size > n_use) {
         *n_samples = n_use - batch_idx * batch_size;

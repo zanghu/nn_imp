@@ -134,26 +134,28 @@ int updateLayer(struct Layer *layer, const struct UpdateArgs *args)
     return SUCCESS;
 }
 
-int getLayerInputShape(int *b, int *row, int *col, int *c, const struct Layer *layer)
+int getLayerShape(int *n_in, int *n_out, const struct Layer *layer)
 {
-    CHK_NIL(b);
-    CHK_NIL(row);
-    CHK_NIL(col);
-    CHK_NIL(c);
+    CHK_NIL(n_in);
+    CHK_NIL(n_out);
     CHK_NIL(layer);
 
     switch (layer->type) {
         case LINEAR_LAYER_TYPE:
-        CHK_ERR(getLinearLayerInputShape(b, row, col, c, (const struct LinearLayer *)layer));
+        CHK_ERR(getLinearLayerShape(n_in, n_out, (const struct LinearLayer *)layer));
         break;
 
         case SIGMOID_LAYER_TYPE:
-        ERR_MSG("sigmoid_layer has no input shape, error.\n");
-        return ERR_COD;
+        //ERR_MSG("sigmoid_layer has no input shape, error.\n");
+        //return ERR_COD;
+        CHK_ERR(getSigmoidLayerShape(n_in, n_out, (const struct SigmoidLayer *)layer));
+        break;
 
         case SOFTMAX_LAYER_TYPE:
-        ERR_MSG("softmax_layer has no input shape, error.\n");
-        return ERR_COD;
+        //ERR_MSG("softmax_layer has no input shape, error.\n");
+        //return ERR_COD;
+        CHK_ERR(getSoftmaxLayerShape(n_in, n_out, (const struct SoftmaxLayer *)layer));
+        break;
 
         default:
         ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));

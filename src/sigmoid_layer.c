@@ -38,6 +38,17 @@ void destroySigmoidLayer(struct SigmoidLayer *layer)
     free(layer);
 }
 
+int getSigmoidLayerShape(int *n_in, int *n_out, const struct SigmoidLayer *layer)
+{
+    CHK_NIL(n_in);
+    CHK_NIL(n_out);
+    CHK_NIL(layer);
+
+    *n_in = layer->n_neurons;
+    *n_out = layer->n_neurons;
+    return SUCCESS;
+}
+
 int getSigmoidLayerInputNumber(int *n_in, const struct SigmoidLayer *layer)
 {
     CHK_NIL(n_in);

@@ -47,19 +47,19 @@ char *getTensorDtypeStrFromEnum(enum DType dtype)
     return "unknow dtype";
 }
 
-void initTensorParameterAsWeight(struct Tensor *matrix)
+void initTensorParameterAsWeight(struct Tensor *tensor)
 {
-    int inputs = matrix->row;
+    int inputs = tensor->row;
     float scale = sqrt(2. / inputs);
     int i = 0;
-    for(i = 0; i < matrix->b * matrix->row * matrix->col * matrix->c; ++i){
-        matrix->data[i] = scale * rand_uniform(-1, 1);
+    for(i = 0; i < tensor->b * tensor->row * tensor->col * tensor->c; ++i){
+        tensor->data[i] = scale * rand_uniform(-1, 1);
     }
 }
 
-void initTensorParameterAsBias(struct Tensor *matrix)
+void initTensorParameterAsBias(struct Tensor *tensor)
 {
-    memset(matrix->data, 0, matrix->b * matrix->row * matrix->col * matrix->c * sizeof(float));
+    memset(tensor->data, 0, tensor->b * tensor->row * tensor->col * tensor->c * sizeof(float));
 }
 
 int createTensor(struct Tensor **t, int batch_size, int row, int col, int channel)
@@ -70,25 +70,25 @@ int createTensor(struct Tensor **t, int batch_size, int row, int col, int channe
     CHK_ERR((col > 0)? 0: 1);
     CHK_ERR((channel > 0)? 0: 1);
 
-    struct Tensor *matrix = calloc(1, sizeof(struct Tensor));
-    if (!matrix) {
+    struct Tensor *tensor = calloc(1, sizeof(struct Tensor));
+    if (!tensor) {
         ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
         return ERR_COD;
     }
-    matrix->data = calloc(batch_size * row * col * channel, sizeof(float));
-    if (matrix->data == NULL) {
+    tensor->data = calloc(batch_size * row * col * channel, sizeof(float));
+    if (tensor->data == NULL) {
         ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
-        free(matrix);
+        free(tensor);
         return ERR_COD;
     }
-    matrix->b = batch_size;
-    matrix->dtype = FLOAT32;
-    matrix->row = row;
-    matrix->col = col;
-    matrix->c = channel;
-    matrix->n = 0; // 初始样本数为0
+    tensor->b = batch_size;
+    tensor->dtype = FLOAT32;
+    tensor->row = row;
+    tensor->col = col;
+    tensor->c = channel;
+    tensor->n = 0; // 初始样本数为0
 
-    *t = matrix;
+    *t = tensor;
     return SUCCESS;
 }
 
@@ -100,35 +100,35 @@ int createTensorI32(struct Tensor **t, int batch_size, int row, int col, int cha
     CHK_ERR((col > 0)? 0: 1);
     CHK_ERR((channel > 0)? 0: 1);
 
-    struct Tensor *matrix = calloc(1, sizeof(struct Tensor));
-    if (!matrix) {
+    struct Tensor *tensor = calloc(1, sizeof(struct Tensor));
+    if (!tensor) {
         ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
         return ERR_COD;
     }
-    matrix->data_i32 = calloc(batch_size * row * col * channel, sizeof(int));
-    if (matrix->data_i32 == NULL) {
+    tensor->data_i32 = calloc(batch_size * row * col * channel, sizeof(int));
+    if (tensor->data_i32 == NULL) {
         ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
-        free(matrix);
+        free(tensor);
         return ERR_COD;
     }
-    matrix->b = batch_size;
-    matrix->dtype = INT32;
-    matrix->row = row;
-    matrix->col = col;
-    matrix->c = channel;
-    matrix->n = 0; // 初始样本数为0
+    tensor->b = batch_size;
+    tensor->dtype = INT32;
+    tensor->row = row;
+    tensor->col = col;
+    tensor->c = channel;
+    tensor->n = 0; // 初始样本数为0
 
-    *t = matrix;
+    *t = tensor;
     return SUCCESS;
 }
 
-void destroyTensor(struct Tensor *matrix)
+void destroyTensor(struct Tensor *tensor)
 {
-    if (matrix) {
-        free(matrix->data);
-        free(matrix->data_i32);
+    if (tensor) {
+        free(tensor->data);
+        free(tensor->data_i32);
     }
-    free(matrix);
+    free(tensor);
 }
 
 int getTensorShape(int *b, int *row, int *col, int *c, const struct Tensor *tensor)
@@ -147,51 +147,71 @@ int getTensorShape(int *b, int *row, int *col, int *c, const struct Tensor *tens
     return SUCCESS;
 }
 
-int getTensorRow(int *row, const struct Tensor *matrix)
+int getTensorRowAndCol(int *row, int *col, const struct Tensor *tensor)
 {
     CHK_NIL(row);
-    CHK_NIL(matrix);
-    *row = matrix->row;
-    return SUCCESS;
-}
-
-int getTensorCol(int *col, const struct Tensor *matrix)
-{
     CHK_NIL(col);
-    CHK_NIL(matrix);
-    *col = matrix->col;
+    CHK_NIL(tensor);
+    *row = tensor->row;
+    *col = tensor->col;
     return SUCCESS;
 }
 
-int getTensorChannel(int *c, const struct Tensor *matrix)
-{
-    CHK_NIL(c);
-    CHK_NIL(matrix);
-    *c = matrix->c;
-    return SUCCESS;
-}
-
-int getTensorBatch(int *b, const struct Tensor *matrix)
+int getTensorBatchAndChannel(int *b, int *c, const struct Tensor *tensor)
 {
     CHK_NIL(b);
-    CHK_NIL(matrix);
-    *b = matrix->b;
+    CHK_NIL(c);
+    CHK_NIL(tensor);
+    *b = tensor->b;
+    *c = tensor->c;
     return SUCCESS;
 }
 
-int getTensorSamples(int *n, const struct Tensor *matrix)
+int getTensorRow(int *row, const struct Tensor *tensor)
+{
+    CHK_NIL(row);
+    CHK_NIL(tensor);
+    *row = tensor->row;
+    return SUCCESS;
+}
+
+int getTensorCol(int *col, const struct Tensor *tensor)
+{
+    CHK_NIL(col);
+    CHK_NIL(tensor);
+    *col = tensor->col;
+    return SUCCESS;
+}
+
+int getTensorChannel(int *c, const struct Tensor *tensor)
+{
+    CHK_NIL(c);
+    CHK_NIL(tensor);
+    *c = tensor->c;
+    return SUCCESS;
+}
+
+int getTensorBatch(int *b, const struct Tensor *tensor)
+{
+    CHK_NIL(b);
+    CHK_NIL(tensor);
+    *b = tensor->b;
+    return SUCCESS;
+}
+
+int getTensorSamples(int *n, const struct Tensor *tensor)
 {
     CHK_NIL(n);
-    CHK_NIL(matrix);
-    *n = matrix->n;
+    CHK_NIL(tensor);
+    *n = tensor->n;
     return SUCCESS;
 }
 
-int getTensorDType(enum DType *dtype, const struct Tensor *matrix)
+int getTensorDType(enum DType *dtype, const struct Tensor *tensor)
 {
     CHK_NIL(dtype);
-    CHK_NIL(matrix);
-    *dtype = matrix->dtype;
+    CHK_NIL(tensor);
+    *dtype = tensor->dtype;
     return SUCCESS;
 }
 
@@ -300,14 +320,17 @@ int linearTensor(struct Tensor *z, const struct Tensor *x, int xt, const struct 
     CHK_NIL(z);
     CHK_NIL(x);
     CHK_NIL(y);
-    CHK_ERR((x->b == y->b)? 0: 1);
-    CHK_ERR((z->row == x->col)? 0: 1);
-    CHK_ERR((z->col == y->col)? 0: 1);
+    CHK_ERR((x->b == z->b)? 0: 1);
+    fprintf(stdout, "(z.b, z.row, z.col, z.c) = (%d, %d, %d, %d)\n", z->b, z->row, z->col, z->c);
+    fprintf(stdout, "(y.b, y.row, y.col, y.c) = (%d, %d, %d, %d)\n", y->b, y->row, y->col, y->c);
+    CHK_ERR((z->col == y->row)? 0: 1);
+    CHK_ERR((x->col == y->col)? 0: 1);
+    CHK_ERR((b->col == y->row)? 0: 1);
 
     if (b) {
         int i = 0;
         for (i = 0; i < x->b; ++i) {
-            memcpy(z->data + i * x->col, b->data, sizeof(float) * x->col);
+            memcpy(z->data + i * z->col, b->data, sizeof(float) * b->col);
         }
     }
 
@@ -316,11 +339,11 @@ int linearTensor(struct Tensor *z, const struct Tensor *x, int xt, const struct 
     //     float *B, int ldb,
     //     float BETA,
     //     float *C, int ldc)
-    gemm(xt, yt, x->col, y->col, x->b, 1., 
+    gemm(xt, yt, x->b, y->row, x->col, 1., 
         x->data, x->col, 
-        y->data, y->col, 
+        y->data, y->row, 
         1., 
-        z->data, y->col);
+        z->data, y->row);
 
     return SUCCESS;
 }

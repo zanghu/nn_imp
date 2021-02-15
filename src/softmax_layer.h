@@ -15,6 +15,7 @@ struct SoftmaxLayer
 int createSoftmaxLayer(struct SoftmaxLayer **l, int n_neurons);
 void destroySoftmaxLayer(struct SoftmaxLayer *layer);
 
+int getSoftmaxLayerShape(int *n_in, int *n_out, const struct SoftmaxLayer *layer);
 int getSoftmaxLayerInputNumber(int *n_in, const struct SoftmaxLayer *layer);
 int getSoftmaxLayerOutputNumber(int *n_out, const struct SoftmaxLayer *layer);
 

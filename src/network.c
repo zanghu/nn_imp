@@ -67,17 +67,17 @@ int createNetwork(struct Network **network, struct Layer **layers, int n_layers,
     for (i = 0; i < n_layers; ++i) {
         int n_out = 0;
         CHK_ERR_GOTO(getLayerOutputNumber(&n_out, net->layers[i]));
-        CHK_ERR_GOTO(createTensor(&(net->deltas[i]), args->batch_size, n_out, 1, 1));
-        CHK_ERR_GOTO(createTensor(&(net->outputs[i]), args->batch_size, n_out, 1, 1));
+        CHK_ERR_GOTO(createTensor(&(net->deltas[i]), args->batch_size, 1, n_out, 1));
+        CHK_ERR_GOTO(createTensor(&(net->outputs[i]), args->batch_size, 1, n_out, 1));
     }
 
     // 连接各层, 实质上就是将各层与其正向传播和反向传播时的输入输出Tensor关联
-    // 注意: 输入层layers[0]没有input和delta_ou
-    for (i = 0; i < n_layers - 1; ++i) {
+    for (i = 0; i < n_layers; ++i) {
         CHK_ERR_GOTO(setLayerOutput(net->layers[i], net->outputs[i]));
         CHK_ERR_GOTO(setLayerInputDelta(net->layers[i], net->deltas[i]));
     }
-    for (i = 1; i < n_layers - 1; ++i) {
+    // 注意: 输入层layers[0]没有input和delta_ou
+    for (i = 1; i < n_layers; ++i) {
         CHK_ERR_GOTO(setLayerInput(net->layers[i], net->outputs[i - 1]));
         CHK_ERR_GOTO(setLayerOutputDelta(net->layers[i], net->deltas[i - 1]));
     }
@@ -135,14 +135,18 @@ static int checkNetworkInput(struct Network *net, const struct Tensor *input)
 
     CHK_NIL(net->layers);
     CHK_NIL(net->layers[0]);
-    int b0, row0, col0, c0;
+    int b0, col0, c0;
     int b1, row1, col1, c1;
-    CHK_ERR(getLayerInputShape(&b0, &row0, &col0, &c0, net->layers[0]));
+    CHK_ERR(getLayerInputNumber(&col0, net->layers[0]));
+    CHK_ERR(getTensorBatchAndChannel(&b0, &c0, net->outputs[0]));
+    CHK_ERR(getTensorShape(&b0, &row1, &col1, &c0, input));
+    //fprintf(stdout, "layer.shape = (%d, %d, %d, %d)\n", b0, 1, col0, c0);
     CHK_ERR(getTensorShape(&b1, &row1, &col1, &c1, input));
-    CHK_ERR((row0 == row1)? 0:1);
+    //fprintf(stdout, "input.shape = (%d, %d, %d, %d)\n", b1, row1, col1, c1);
+    CHK_ERR((b0 == b1)? 0:1);
+    //CHK_ERR((row0 == row1)? 0:1);
     CHK_ERR((col0 == col1)? 0:1);
     CHK_ERR((c0 == c1)? 0:1);
-    CHK_ERR((b0 == b1)? 0:1);
 
     return SUCCESS;
 }
@@ -156,6 +160,7 @@ int forwardNetwork(struct Network *net, const struct Tensor *input)
     CHK_ERR(setLayerInput(net->layers[0], input));
     int i = 0;
     for (i = 0; i < net->n_layers; ++i) {
+        fprintf(stdout, "forward layer %d...\n", i);
         CHK_ERR(forwardLayer(net->layers[i]));
     }
     CHK_ERR(forwardCost(net->cost));

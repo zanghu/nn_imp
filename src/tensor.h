@@ -17,18 +17,20 @@ struct Tensor;
 
 int createTensor(struct Tensor **t, int batch_size, int row, int col, int channel);
 int createTensorI32(struct Tensor **t, int batch_size, int row, int col, int channel);
-void destroyTensor(struct Tensor *matrix);
+void destroyTensor(struct Tensor *tensor);
 
-void initTensorParameterAsWeight(struct Tensor *matrix);
-void initTensorParameterAsBias(struct Tensor *matrix);
+void initTensorParameterAsWeight(struct Tensor *tensor);
+void initTensorParameterAsBias(struct Tensor *tensor);
 
 int getTensorShape(int *b, int *row, int *col, int *c, const struct Tensor *tensor);
-int getTensorBatch(int *b, const struct Tensor *matrix);
-int getTensorRow(int *row, const struct Tensor *matrix);
-int getTensorCol(int *col, const struct Tensor *matrix);
-int getTensorChannel(int *c, const struct Tensor *matrix);
-int getTensorSamples(int *n, const struct Tensor *matrix);
-int getTensorDType(enum DType *dtype, const struct Tensor *matrix);
+int getTensorRowAndCol(int *row, int *col, const struct Tensor *tensor);
+int getTensorBatchAndChannel(int *b, int *c, const struct Tensor *tensor);
+int getTensorBatch(int *b, const struct Tensor *tensor);
+int getTensorRow(int *row, const struct Tensor *tensor);
+int getTensorCol(int *col, const struct Tensor *tensor);
+int getTensorChannel(int *c, const struct Tensor *tensor);
+int getTensorSamples(int *n, const struct Tensor *tensor);
+int getTensorDType(enum DType *dtype, const struct Tensor *tensor);
 int getTensorData(void **data, struct Tensor *tensor);
 int setTensorData(struct Tensor *tensor, const void *data, enum DType dtype, int n);
 

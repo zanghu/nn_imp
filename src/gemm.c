@@ -74,7 +74,7 @@ void time_random_matrix(int TA, int TB, int m, int k, int n)
  * @param M, N, K        (M, K)矩阵乘以(K, N)矩阵
  * @param A, B           A是(M, K)或(K, M)矩阵, B是(N, K)或(K, N)矩阵
  * @param ALPHA, BETA    gemm(...) = ALPHA * MatMul(A, B) + BETA *C
- * @param  lda, ldb, ldc 分别表示A, B, C的元素循环间隔, 一般都设为1
+ * @param  lda, ldb, ldc 分别表示A, B, C的元素循环间隔,
  * @param C              初始保存偏置量矩阵, 计算过程中会被计算结果覆盖, 最终用来保存计算结果
  */
 void gemm(int TA, int TB, int M, int N, int K, float ALPHA, 
