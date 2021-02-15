@@ -12,15 +12,40 @@
 
 struct Tensor {
     enum DType dtype;
+    int b; // batch_size
     int row;
     int col;
     int c; // channel
-    int b; // batch_size
+    int n; // 实际装填的样本数， n<=b
     float *data;
     int *data_i32;
     //long long *data_i64;
     //double *data_f64;
 };
+
+char *getTensorDtypeStrFromEnum(enum DType dtype)
+{
+    switch (dtype) {
+        case FLOAT32:
+        return "float32";
+
+        case FLOAT64:
+        return "float64";
+
+        case INT32:
+        return "int32";
+
+        case INT64:
+        return "int64";
+
+        case UINT8:
+        return "uint8";
+
+        default:
+        return "unknow dtype";
+    }
+    return "unknow dtype";
+}
 
 void initTensorParameterAsWeight(struct Tensor *matrix)
 {
@@ -56,11 +81,12 @@ int createTensor(struct Tensor **t, int batch_size, int row, int col, int channe
         free(matrix);
         return ERR_COD;
     }
+    matrix->b = batch_size;
     matrix->dtype = FLOAT32;
     matrix->row = row;
     matrix->col = col;
-    matrix->b = batch_size;
     matrix->c = channel;
+    matrix->n = 0; // 初始样本数为0
 
     *t = matrix;
     return SUCCESS;
@@ -85,11 +111,12 @@ int createTensorI32(struct Tensor **t, int batch_size, int row, int col, int cha
         free(matrix);
         return ERR_COD;
     }
+    matrix->b = batch_size;
     matrix->dtype = INT32;
     matrix->row = row;
     matrix->col = col;
-    matrix->b = batch_size;
     matrix->c = channel;
+    matrix->n = 0; // 初始样本数为0
 
     *t = matrix;
     return SUCCESS;
@@ -102,6 +129,22 @@ void destroyTensor(struct Tensor *matrix)
         free(matrix->data_i32);
     }
     free(matrix);
+}
+
+int getTensorShape(int *b, int *row, int *col, int *c, const struct Tensor *tensor)
+{
+    CHK_NIL(b);
+    CHK_NIL(row);
+    CHK_NIL(col);
+    CHK_NIL(c);
+    CHK_NIL(tensor);
+
+    *b = tensor->b;
+    *row = tensor->row;
+    *col = tensor->col;
+    *c = tensor->c;
+
+    return SUCCESS;
 }
 
 int getTensorRow(int *row, const struct Tensor *matrix)
@@ -136,6 +179,14 @@ int getTensorBatch(int *b, const struct Tensor *matrix)
     return SUCCESS;
 }
 
+int getTensorSamples(int *n, const struct Tensor *matrix)
+{
+    CHK_NIL(n);
+    CHK_NIL(matrix);
+    *n = matrix->n;
+    return SUCCESS;
+}
+
 int getTensorDType(enum DType *dtype, const struct Tensor *matrix)
 {
     CHK_NIL(dtype);
@@ -162,6 +213,40 @@ int getTensorData(void **data, struct Tensor *tensor)
         *data = tensor->data;
         break;
     }
+    return SUCCESS;
+}
+
+int setTensorData(struct Tensor *tensor, const void *data, enum DType dtype, int n)
+{
+    CHK_NIL(tensor); 
+    CHK_NIL(data);
+
+    int n_features = tensor->col * tensor->row * tensor->c;
+    switch (tensor->dtype) {
+        case FLOAT32:
+        switch (dtype) {
+            case UINT8:
+            {
+                const unsigned char *src = data;
+                int i, j;
+                for (i = 0; i < n; ++i) {
+                    for (j = 0; j < n_features; ++j) {
+                        tensor->data[i * n_features + j] = (float)(src[i * n_features + j]);
+                    }
+                }
+            }
+            break;
+
+            default:
+            ERR_MSG("src_dtype: %s to dst_dtype: %s not supported, error.\n", getTensorDtypeStrFromEnum(dtype), getTensorDtypeStrFromEnum(tensor->dtype));
+            return ERR_COD;
+        }
+        break;
+
+        default:
+        return ERR_COD;
+    }
+    tensor->n = n;
     return SUCCESS;
 }
 
@@ -356,7 +441,7 @@ int probTensor(float *val, const struct Tensor *p, const struct Tensor *gt)
             }
         }
     }
-    *val = sum_log_p;
+    *val = sum_log_p / b; // 计算平均值, 用于观察评估寻俩效果的代价值建议与样本数无关
     return SUCCESS;
 }
  

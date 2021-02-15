@@ -18,6 +18,7 @@ struct Network {
     struct Cost *cost;  // Network不负责释放这部分内存
     struct Tensor **outputs;
     struct Tensor **deltas;
+    struct Tensor *input; // 输入数据
     struct UpdateArgs update_args;
 };
 
@@ -126,11 +127,31 @@ void destroyNetwork(struct Network *net)
     }
     free(net);
 }
+
+static int checkNetworkInput(struct Network *net, const struct Tensor *input)
+{
+    CHK_NIL(net);
+    CHK_NIL(input);
+
+    CHK_NIL(net->layers);
+    CHK_NIL(net->layers[0]);
+    int b0, row0, col0, c0;
+    int b1, row1, col1, c1;
+    CHK_ERR(getLayerInputShape(&b0, &row0, &col0, &c0, net->layers[0]));
+    CHK_ERR(getTensorShape(&b1, &row1, &col1, &c1, input));
+    CHK_ERR((row0 == row1)? 0:1);
+    CHK_ERR((col0 == col1)? 0:1);
+    CHK_ERR((c0 == c1)? 0:1);
+    CHK_ERR((b0 == b1)? 0:1);
+
+    return SUCCESS;
+}
  
 int forwardNetwork(struct Network *net, const struct Tensor *input)
 {
     CHK_NIL(net);
     CHK_NIL(input);
+    CHK_ERR(checkNetworkInput(net, input));
 
     CHK_ERR(setLayerInput(net->layers[0], input));
     int i = 0;

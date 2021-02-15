@@ -118,13 +118,42 @@ int updateLayer(struct Layer *layer, const struct UpdateArgs *args)
         CHK_ERR(updateLinearLayer((struct LinearLayer *)layer, args));
         break;
 
+        case SIGMOID_LAYER_TYPE: // sigmoid_layer无需参数更新，直接略过
+        //ERR_MSG("NotImplementedError, SigmoidLayer has no update method, error.\n");
+        //return ERR_COD;
+        break;
+
+        case SOFTMAX_LAYER_TYPE: // softmax_layer无需参数更新，直接略过
+        //ERR_MSG("NotImplementedError, SoftmaxLayer has no update method, error.\n");
+        break;
+
+        default:
+        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
+int getLayerInputShape(int *b, int *row, int *col, int *c, const struct Layer *layer)
+{
+    CHK_NIL(b);
+    CHK_NIL(row);
+    CHK_NIL(col);
+    CHK_NIL(c);
+    CHK_NIL(layer);
+
+    switch (layer->type) {
+        case LINEAR_LAYER_TYPE:
+        CHK_ERR(getLinearLayerInputShape(b, row, col, c, (const struct LinearLayer *)layer));
+        break;
+
         case SIGMOID_LAYER_TYPE:
-        ERR_MSG("NotImplementedError, SigmoidLayer has no update method, error.\n");
+        ERR_MSG("sigmoid_layer has no input shape, error.\n");
         return ERR_COD;
 
         case SOFTMAX_LAYER_TYPE:
-        ERR_MSG("NotImplementedError, SoftmaxLayer has no update method, error.\n");
-        break;
+        ERR_MSG("softmax_layer has no input shape, error.\n");
+        return ERR_COD;
 
         default:
         ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));

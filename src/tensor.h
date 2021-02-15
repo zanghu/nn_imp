@@ -7,8 +7,11 @@ enum DType
     FLOAT32,
     FLOAT64,
     INT32,
-    INT64
+    INT64,
+    UINT8
 };
+
+char *getTensorDtypeStrFromEnum(enum DType dtype);
 
 struct Tensor;
 
@@ -19,12 +22,15 @@ void destroyTensor(struct Tensor *matrix);
 void initTensorParameterAsWeight(struct Tensor *matrix);
 void initTensorParameterAsBias(struct Tensor *matrix);
 
+int getTensorShape(int *b, int *row, int *col, int *c, const struct Tensor *tensor);
+int getTensorBatch(int *b, const struct Tensor *matrix);
 int getTensorRow(int *row, const struct Tensor *matrix);
 int getTensorCol(int *col, const struct Tensor *matrix);
 int getTensorChannel(int *c, const struct Tensor *matrix);
-int getTensorBatch(int *b, const struct Tensor *matrix);
+int getTensorSamples(int *n, const struct Tensor *matrix);
 int getTensorDType(enum DType *dtype, const struct Tensor *matrix);
 int getTensorData(void **data, struct Tensor *tensor);
+int setTensorData(struct Tensor *tensor, const void *data, enum DType dtype, int n);
 
 int linearTensor(struct Tensor *z, const struct Tensor *x, int xt, const struct Tensor *y, int yt, const struct Tensor *b);
 int activateTensor(struct Tensor *y, const struct Tensor *x, enum ActivationType act_type);

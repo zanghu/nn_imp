@@ -21,6 +21,7 @@ struct LinearLayer
 int createLinearLayer(struct LinearLayer **l, int n_in, int n_out);
 void destroyLinearLayer(struct LinearLayer *layer);
 
+int getLinearLayerInputShape(int *b, int *row, int *col, int *c, const struct LinearLayer *layer);
 int getLinearLayerInputNumber(int *n_in, const struct LinearLayer *layer);
 int getLinearLayerOutputNumber(int *n_out, const struct LinearLayer *layer);
 

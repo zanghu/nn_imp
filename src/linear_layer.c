@@ -73,6 +73,18 @@ void destroyLinearLayer(struct LinearLayer *layer)
     free(layer);
 }
 
+int getLinearLayerInputShape(int *b, int *row, int *col, int *c, const struct LinearLayer *layer)
+{
+    CHK_NIL(b);
+    CHK_NIL(row);
+    CHK_NIL(col);
+    CHK_NIL(c);
+    CHK_NIL(layer);
+
+    CHK_ERR(getTensorShape(b, row, col, c, layer->w));
+    return SUCCESS;
+}
+
 int getLinearLayerInputNumber(int *n_in, const struct LinearLayer *layer)
 {
     CHK_NIL(layer);
