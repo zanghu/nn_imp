@@ -2,6 +2,7 @@
 
 #include "tensor.h"
 #include "opt_alg.h"
+#include "probe.h"
 
 enum LayerType
 {
@@ -25,9 +26,9 @@ struct Layer
     //float momentum;
 };
 
-int forwardLayer(struct Layer *layer);
-int backwardLayer(struct Layer *layer);
-int updateLayer(struct Layer *layer, const struct UpdateArgs *args);
+int forwardLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe *probe);
+int backwardLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe *probe);
+int updateLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe *probe);
 
 int getLayerInputNumber(int *n_in, const struct Layer *layer);
 int getLayerOutputNumber(int *n_out, const struct Layer *layer);

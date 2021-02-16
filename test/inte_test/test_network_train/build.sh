@@ -25,9 +25,10 @@ TEST_DIR="$PROJECT_DIR/test"
 
 INC_CMD="-I. -I$SRC_DIR -I$SRC_DIR/datasets"
 LIB_CMD="-lm"
+#CFLAGS="-g -Wall -O2 -fopenmp"
+CFLAGS="-g -Wall -O2"
 
-gcc -g -Wall -O2 \
-    -fopenmp \
+gcc $CFLAGS \
     $INC_CMD \
     test.c \
     $SRC_DIR/datasets/mnist.c \

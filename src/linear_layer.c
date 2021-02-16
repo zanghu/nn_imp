@@ -8,6 +8,7 @@
 #include "layer.h"
 #include "linear_layer.h"
 #include "opt_alg.h"
+#include "probe.h"
 
 
 struct LinearLayer
@@ -100,7 +101,7 @@ int getLinearLayerOutputNumber(int *n_out, const struct LinearLayer *layer)
 /**
  * @brief 正向传播, 计算当前层非线性变换后输出output, 相当于full_connected_layer的隐藏层神经元的值
  */
-int forwardLinearLayer(struct LinearLayer *layer)
+int forwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(layer);
 
@@ -112,16 +113,19 @@ int forwardLinearLayer(struct LinearLayer *layer)
 /**
  * @brief 反向传播, 任务包括：(1)计算当前层梯度gradient（保存在layer->w_grad和layer->b_grad）, (2)计算当前层灵敏度输出delta_new
  */
-int backwardLinearLayer(struct LinearLayer *layer)
+int backwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(layer);
 
     // backward propagation
-    CHK_ERR(linearTensor(((struct Layer *)layer)->delta_out, ((struct Layer *)layer)->delta_in, 0, layer->w, 0, NULL));
+    if (((struct Layer *)layer)->delta_out) { // 反向传播到达layer[0]时，delta_out为NULL
+        CHK_ERR(linearTensor1(((struct Layer *)layer)->delta_out, ((struct Layer *)layer)->delta_in, 0, layer->w, 0, NULL));
+    }
 
     // update gradient
-    CHK_ERR(linearTensor(layer->w_grad, ((struct Layer *)layer)->delta_in, 1, ((struct Layer *)layer)->input, 0, NULL)); // update weight gradient
-    CHK_ERR(mulTensorPointwiseAndSum(layer->b_grad, ((struct Layer *)layer)->delta_in, ((struct Layer *)layer)->input)); // update bias gradient
+    CHK_ERR(linearTensor2(layer->w_grad, ((struct Layer *)layer)->delta_in, 1, ((struct Layer *)layer)->input, 0, NULL)); // update weight gradient
+    //CHK_ERR(mulTensorPointwiseAndSum(layer->b_grad, ((struct Layer *)layer)->delta_in, ((struct Layer *)layer)->input)); // update bias gradient
+    CHK_ERR(sumTensorAxisCol(layer->b_grad, ((struct Layer *)layer)->delta_in)); // update bias gradient
 
     return SUCCESS;
 }
@@ -129,14 +133,14 @@ int backwardLinearLayer(struct LinearLayer *layer)
 /**
  * @brief: 更新当前层参数
  */
-int updateLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args)
+int updateLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(layer);
     CHK_NIL(args);
 
     // 注意：这里的lr应该是已经除以了batch_size后的lr
-    CHK_ERR(addTensor(layer->w, layer->w_grad, args->lr, args->momentum));
-    CHK_ERR(addTensor(layer->b, layer->b_grad, args->lr, args->momentum));
+    CHK_ERR(addTensor(layer->w, layer->w_grad, args->lr / args->batch_size, args->momentum));
+    CHK_ERR(addTensor(layer->b, layer->b_grad, args->lr / args->batch_size, args->momentum));
 
     return SUCCESS;
 }

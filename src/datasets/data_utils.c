@@ -73,4 +73,20 @@ err_end:
     free(res);
     return ERR_COD;
 }
-    
+
+/**
+ * @param norm_cost 归一化常数，将像素值归一化到[0, 1)
+ */
+int transformToFloat32FromUint8(float *dst, const unsigned char *src, int n_elems, int norm_const)
+{
+    CHK_NIL(dst);
+    CHK_NIL(src);
+    CHK_ERR((n_elems > 0)? 0: 1);
+
+    int i;
+    for (i = 0; i < n_elems; ++i) {
+        dst[i] = (float)(src[i]) / (float)(norm_const);
+    }
+
+    return SUCCESS;
+}

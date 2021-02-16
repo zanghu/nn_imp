@@ -8,6 +8,8 @@
 #include "activations.h"
 #include "layer.h"
 #include "sigmoid_layer.h"
+#include "opt_alg.h"
+#include "probe.h"
 
 
 struct SigmoidLayer
@@ -68,7 +70,7 @@ int getSigmoidLayerOutputNumber(int *n_out, const struct SigmoidLayer *layer)
 /**
  * @brief 正向传播, 任务包括：(1)计算当前层线性变换后输出hidden, (2)计算当前层非线性变换后输出output
  */
-int forwardSigmoidLayer(struct SigmoidLayer *layer)
+int forwardSigmoidLayer(struct SigmoidLayer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(layer);
 
@@ -80,7 +82,7 @@ int forwardSigmoidLayer(struct SigmoidLayer *layer)
 /**
  * @brief 反向传播, 任务包括：(1)计算当前层梯度gradient（保存在layer->w_grad和layer->b_grad）, (2)计算当前层灵敏度输出delta_new
  */
-int backwardSigmoidLayer(struct SigmoidLayer *layer)
+int backwardSigmoidLayer(struct SigmoidLayer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(layer);
 

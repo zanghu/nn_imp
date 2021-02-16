@@ -6,6 +6,8 @@
 #include "tensor.h"
 #include "cost.h"
 #include "ce_cost.h"
+#include "opt_alg.h"
+#include "probe.h"
 
 /*
 struct Cost
@@ -65,13 +67,13 @@ int setCostDelta(struct Cost *cost, const struct Tensor *delta)
     return SUCCESS;
 }
 
-int forwardCost(struct Cost *cost)
+int getCostGroundTruthAttributes(int *n_features, enum DType *dtype, const struct Cost *cost)
 {
     CHK_NIL(cost);
 
     switch (cost->type)  {
         case CE_COST_TYPE:
-        CHK_ERR(forwardCECost((struct CECost *)cost));
+        CHK_ERR(getCECostGroundTruthAttributes(n_features, dtype, (const struct CECost *)cost));
         break;
 
         default:
@@ -81,14 +83,29 @@ int forwardCost(struct Cost *cost)
     return SUCCESS;
 }
 
-int backwardCost(struct Cost *cost, const struct Tensor *gt)
+int forwardCost(struct Cost *cost, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(cost);
-    CHK_NIL(gt);
 
     switch (cost->type)  {
         case CE_COST_TYPE:
-        CHK_ERR(backwardCECost((struct CECost *)cost, gt));
+        CHK_ERR(forwardCECost((struct CECost *)cost, args, probe));
+        break;
+
+        default:
+        ERR_MSG("NotImplementedError, error.\n");
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
+int backwardCost(struct Cost *cost, const struct Tensor *gt, const struct UpdateArgs *args, struct Probe *probe)
+{
+    CHK_NIL(cost);
+
+    switch (cost->type)  {
+        case CE_COST_TYPE:
+        CHK_ERR(backwardCECost((struct CECost *)cost, gt, args, probe));
         break;
 
         default:

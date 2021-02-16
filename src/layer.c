@@ -5,6 +5,7 @@
 #include "sigmoid_layer.h"
 #include "softmax_layer.h"
 #include "opt_alg.h"
+#include "probe.h"
 
 /*
 struct Layer
@@ -61,21 +62,21 @@ void destroyLayer(struct Layer *layer)
 }
 */
 
-int forwardLayer(struct Layer *layer)
+int forwardLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(layer);
 
     switch (layer->type) {
         case LINEAR_LAYER_TYPE:
-        CHK_ERR(forwardLinearLayer((struct LinearLayer *)layer));
+        CHK_ERR(forwardLinearLayer((struct LinearLayer *)layer, args, probe));
         break;
 
         case SIGMOID_LAYER_TYPE:
-        CHK_ERR(forwardSigmoidLayer((struct SigmoidLayer *)layer));
+        CHK_ERR(forwardSigmoidLayer((struct SigmoidLayer *)layer, args, probe));
         break;
 
         case SOFTMAX_LAYER_TYPE:
-        CHK_ERR(forwardSoftmaxLayer((struct SoftmaxLayer *)layer));
+        CHK_ERR(forwardSoftmaxLayer((struct SoftmaxLayer *)layer, args, probe));
         break;
 
         default:
@@ -85,21 +86,21 @@ int forwardLayer(struct Layer *layer)
     return SUCCESS;
 }
 
-int backwardLayer(struct Layer *layer)
+int backwardLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(layer);
 
     switch (layer->type) {
         case LINEAR_LAYER_TYPE:
-        CHK_ERR(backwardLinearLayer((struct LinearLayer *)layer));
+        CHK_ERR(backwardLinearLayer((struct LinearLayer *)layer, args, probe));
         break;
 
         case SIGMOID_LAYER_TYPE:
-        CHK_ERR(backwardSigmoidLayer((struct SigmoidLayer *)layer));
+        CHK_ERR(backwardSigmoidLayer((struct SigmoidLayer *)layer, args, probe));
         break;
 
         case SOFTMAX_LAYER_TYPE:
-        CHK_ERR(backwardSoftmaxLayer((struct SoftmaxLayer *)layer));
+        CHK_ERR(backwardSoftmaxLayer((struct SoftmaxLayer *)layer, args, probe));
         break;
 
         default:
@@ -109,13 +110,13 @@ int backwardLayer(struct Layer *layer)
     return SUCCESS;
 }
 
-int updateLayer(struct Layer *layer, const struct UpdateArgs *args)
+int updateLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(layer);
 
     switch (layer->type) {
         case LINEAR_LAYER_TYPE:
-        CHK_ERR(updateLinearLayer((struct LinearLayer *)layer, args));
+        CHK_ERR(updateLinearLayer((struct LinearLayer *)layer, args, probe));
         break;
 
         case SIGMOID_LAYER_TYPE: // sigmoid_layer无需参数更新，直接略过

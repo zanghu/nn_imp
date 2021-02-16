@@ -11,6 +11,7 @@
 #include "tensor.h"
 #include "network.h"
 #include "opt_alg.h"
+#include "probe.h"
 
 struct Network {
     int n_layers;
@@ -18,16 +19,15 @@ struct Network {
     struct Cost *cost;  // Network不负责释放这部分内存
     struct Tensor **outputs;
     struct Tensor **deltas;
-    struct Tensor *input; // 输入数据
-    struct UpdateArgs update_args;
+    struct Tensor *input; // 输入数据缓存
+    struct Tensor *gt; // 样本真值缓存
 };
 
-int createNetwork(struct Network **network, struct Layer **layers, int n_layers, struct Cost *cost, const struct UpdateArgs *args)
+int createNetwork(struct Network **network, struct Layer **layers, int n_layers, struct Cost *cost)
 {
     CHK_NIL(layers);
     CHK_ERR((n_layers > 0)? 0: 1);
     CHK_NIL(cost);
-    CHK_ERR(checkUpdateArgs(args));
 
     // 检查相邻层神经元个数是否匹配
     int i = 0;
@@ -51,9 +51,6 @@ int createNetwork(struct Network **network, struct Layer **layers, int n_layers,
     net->layers = layers;
     net->n_layers = n_layers;
     net->cost = cost;
-    (net->update_args).batch_size = args->batch_size;
-    (net->update_args).lr = (args->lr) / args->batch_size; // 学习速率依batch递减, 模仿yolov2
-    (net->update_args).momentum = args->momentum;
 
     // 创建其他部分
     CHK_NIL_GOTO((net->layers = calloc(n_layers, sizeof(struct Layer *))));
@@ -61,9 +58,27 @@ int createNetwork(struct Network **network, struct Layer **layers, int n_layers,
         net->layers[i] = layers[i];
     }
 
+    *network = net;
+    return SUCCESS;
+
+err_end:
+    if (net) {
+        free(net->layers);
+    }
+    free(net);
+    return ERR_COD;
+}
+
+static int allocNetworkCache(struct Network *net, const struct UpdateArgs *args)
+{
+    CHK_NIL(net);
+    CHK_NIL(args);
+
+    int n_layers = net->n_layers;
     CHK_NIL_GOTO((net->deltas = calloc(n_layers, sizeof(struct Tensor *))));
     CHK_NIL_GOTO((net->outputs = calloc(n_layers, sizeof(struct Tensor *))));
 
+    int i;
     for (i = 0; i < n_layers; ++i) {
         int n_out = 0;
         CHK_ERR_GOTO(getLayerOutputNumber(&n_out, net->layers[i]));
@@ -84,27 +99,70 @@ int createNetwork(struct Network **network, struct Layer **layers, int n_layers,
     CHK_ERR_GOTO(setCostInput(net->cost, net->outputs[n_layers - 1]));
     CHK_ERR_GOTO(setCostDelta(net->cost, net->deltas[n_layers - 1]));
 
-    *network = net;
     return SUCCESS;
 
 err_end:
+    if (net->outputs) {
+        for (i = 0; i < net->n_layers - 1; ++i) {
+            destroyTensor(net->outputs[i]);
+        }
+    }
+    if (net->deltas) {
+        for (i = 0; i < net->n_layers - 1; ++i) {
+            destroyTensor(net->deltas[i]);
+        }
+    }
+    free(net->outputs);
+    free(net->deltas);
+
+    return ERR_COD;
+}
+
+static void freeNetworkCache(struct Network *net)
+{
     if (net) {
         if (net->outputs) {
-            for (i = 0; i < n_layers - 1; ++i) {
+            int i;
+            for (i = 0; i < net->n_layers - 1; ++i) {
                 destroyTensor(net->outputs[i]);
             }
         }
         if (net->deltas) {
-            for (i = 0; i < n_layers - 1; ++i) {
+            int i;
+            for (i = 0; i < net->n_layers - 1; ++i) {
                 destroyTensor(net->deltas[i]);
             }
         }
         free(net->outputs);
         free(net->deltas);
-        free(net->layers);
     }
-    free(net);
-    return ERR_COD;
+}
+
+static int reallocNetworkCache(struct Network *net, const struct UpdateArgs *args)
+{
+    CHK_NIL(net);
+    CHK_NIL(args);
+    CHK_NIL(net->layers);
+    CHK_ERR((net->n_layers > 0)? 0: 1);
+
+    int need_realloc = 0;
+    if (net->outputs) {
+        int b;
+        CHK_ERR(getTensorBatch(&b, net->outputs[0]));
+        if (b < args->batch_size) { // 原有的缓冲区空间不足，需要重新分配
+            need_realloc =1;
+        }
+    }
+    else {
+        need_realloc = 1;
+    }
+
+    if (need_realloc) {
+        freeNetworkCache(net);
+        CHK_ERR(allocNetworkCache(net, args));
+    }
+
+    return SUCCESS;
 }
 
 void destroyNetwork(struct Network *net)
@@ -124,10 +182,13 @@ void destroyNetwork(struct Network *net)
         }
         free(net->deltas);
         free(net->layers);
+        free(net->input);
+        free(net->gt);
     }
     free(net);
 }
 
+/*
 static int checkNetworkInput(struct Network *net, const struct Tensor *input)
 {
     CHK_NIL(net);
@@ -144,50 +205,83 @@ static int checkNetworkInput(struct Network *net, const struct Tensor *input)
     CHK_ERR(getTensorShape(&b1, &row1, &col1, &c1, input));
     //fprintf(stdout, "input.shape = (%d, %d, %d, %d)\n", b1, row1, col1, c1);
     CHK_ERR((b0 == b1)? 0:1);
-    //CHK_ERR((row0 == row1)? 0:1);
     CHK_ERR((col0 == col1)? 0:1);
     CHK_ERR((c0 == c1)? 0:1);
 
     return SUCCESS;
 }
+*/
  
-int forwardNetwork(struct Network *net, const struct Tensor *input)
+int forwardNetwork(struct Network *net, const void *input_data, int n_samples, const char *dtype_str, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(net);
-    CHK_NIL(input);
-    CHK_ERR(checkNetworkInput(net, input));
+    CHK_NIL(input_data);
+    CHK_NIL(dtype_str);
+    CHK_ERR(checkUpdateArgs(args));
+    CHK_NIL(net->layers);
 
-    CHK_ERR(setLayerInput(net->layers[0], input));
+    // 每次运行时，检查是否需要分配输入输出缓冲区空间，可能的原因包括：
+    // (1)网络首次运行;
+    // (2)batch_size发生变化，且大于之前分配的缓冲区大小。
+    CHK_ERR(reallocNetworkCache(net, args));
+
+    // 输入数据绑定Tensor对象
+    enum DType dtype = getTensorDtypeEnumFromStr(dtype_str);
+    if (net->input) {
+        CHK_ERR(setTensorBatchAndDataByReplace(net->input, input_data, n_samples, dtype, 0)); // need_free=0, 因为输入数据由用户分配且用户拥有句柄，因此由用户负责释放
+    }
+    else {
+        int n_in;
+        CHK_ERR(getLayerInputNumber(&n_in, net->layers[0]));
+        CHK_ERR(createTensorWithDataRef(&(net->input), n_samples, 1, n_in, 1, input_data, dtype));
+    }
+
+    CHK_ERR(setLayerInput(net->layers[0], net->input));
     int i = 0;
     for (i = 0; i < net->n_layers; ++i) {
         fprintf(stdout, "forward layer %d...\n", i);
-        CHK_ERR(forwardLayer(net->layers[i]));
+        CHK_ERR(forwardLayer(net->layers[i], args, probe));
     }
-    CHK_ERR(forwardCost(net->cost));
+    CHK_ERR(forwardCost(net->cost, args, probe));
 
     return 0;
 }
 
-int backwardNetwork(struct Network *net, const struct Tensor *gt)
+int backwardNetwork(struct Network *net, const void *gt_data, int n_samples, const char *dtype_str, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(net);
-    CHK_NIL(gt);
+    CHK_NIL(gt_data);
+    CHK_ERR(checkUpdateArgs(args));
 
-    CHK_ERR(backwardCost(net->cost, gt));
+    // gt绑定Tensor对象
+    enum DType dtype = getTensorDtypeEnumFromStr(dtype_str);
+    if (net->gt) {
+        CHK_ERR(setTensorBatchAndDataByReplace(net->gt, gt_data, n_samples, dtype, 0)); // need_free=0, 因为输入数据由用户分配且用户拥有句柄，因此由用户负责释放
+    }
+    else {
+        int n_features;
+        enum DType dtype_needed;
+        CHK_ERR(getCostGroundTruthAttributes(&n_features, &dtype_needed,net->cost));
+        CHK_ERR((dtype == dtype_needed)? 0: 1);
+        CHK_ERR(createTensorWithDataRef(&(net->gt), n_samples, 1, n_features, 1, gt_data, dtype));
+    }
+
+    CHK_ERR(backwardCost(net->cost, net->gt, args, probe));
     int i = 0;
     for (i = net->n_layers - 1; i >=0; --i) {
-        CHK_ERR(backwardLayer(net->layers[i]));
+        fprintf(stdout, "backward layer %d...\n", i);
+        CHK_ERR(backwardLayer(net->layers[i], args, probe));
     }
     return 0;
 }
 
-int updateNetwork(struct Network *net)
+int updateNetwork(struct Network *net, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(net);
 
-    int i = 0;
+    int i;
     for (i = net->n_layers - 1; i >= 0; --i) {
-        CHK_ERR(updateLayer(net->layers[i], &(net->update_args)));
+        CHK_ERR(updateLayer(net->layers[i], args, probe));
     }
     return SUCCESS;
 }

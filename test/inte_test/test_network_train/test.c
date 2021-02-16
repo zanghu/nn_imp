@@ -10,8 +10,9 @@
 #include "cost.h"
 #include "ce_cost.h"
 #include "opt_alg.h"
+#include "probe.h"
 #include "mnist.h"
-#include "tensor.h"
+#include "data_utils.h"
 #include "debug_macros.h"
 
 #define DATASET_DIR ("/home/zanghu/data_base/mnist")
@@ -37,7 +38,7 @@ int main()
     args.momentum = 0.0; // 不使用动量法
     args.n_epochs = 1000; // 最大循环数
     struct Network *net = NULL;
-    CHK_ERR(createNetwork(&net, layers, 3, (struct Cost *)ce_cost, &args));
+    CHK_ERR(createNetwork(&net, layers, 3, (struct Cost *)ce_cost));
     printf("network create finish.\n");
 
     // 读取数据集
@@ -47,14 +48,21 @@ int main()
     // 训练
     int n_train = 50000;
     //int n_valid = 10000;
-    struct Tensor *input = NULL;
-    struct Tensor *gt = NULL;
-    CHK_ERR(createTensor(&input, args.batch_size, 1, MNIST_WIDTH * MNIST_HEIGHT, 1));
-    CHK_ERR(createTensor(&gt, args.batch_size, 1, MNIST_N_CLASSES, 1));
+    float *input = NULL;
+    //unsigned char *gt = NULL;
+    CHK_NIL((input = calloc(args.batch_size * MNIST_WIDTH * MNIST_HEIGHT * 1, sizeof(float))));
+    //CHK_NIL((gt = calloc(args.batch_size * MNIST_N_CLASSES * 1, sizeof(unsigned char))));
+
+    // 探针
+    struct Probe probe;
+    memset(&probe, 0, sizeof(struct Probe));
+    probe.sw_p_class = 1;
+    CHK_NIL((probe.p_class = calloc(args.batch_size * MNIST_N_CLASSES, sizeof(float))));
+    probe.sw_ce_cost = 1;
 
     struct timeval t_train_0, t_train_1, t_train_2;
     CHK_ERR(gettimeofday(&t_train_0, NULL));
-    int n_epochs = 1000;
+    int n_epochs = 2;
     for (int k = 0; k < n_epochs; ++k) {
         int n_iters = 0;
         const void *data = NULL;
@@ -69,20 +77,20 @@ int main()
                 fprintf(stdout, "n_iters = %d, data is NULL\n", n_iters);
                 break;
             }
-            CHK_ERR(setTensorData(input, data, UINT8, n_samples));
-            CHK_ERR(setTensorData(gt, label_onehot, UINT8, n_samples));
+            CHK_ERR(transformToFloat32FromUint8(input, data, args.batch_size * MNIST_WIDTH * MNIST_HEIGHT, 255)); // 图像数据需要做数据类型转换，类标数据不需要
 
             // 训练
-            CHK_ERR(forwardNetwork(net, input));
-            CHK_ERR(backwardNetwork(net, gt));
-            CHK_ERR(updateNetwork(net));
+            CHK_ERR(forwardNetwork(net, input, n_samples, "float32", &args, &probe));
+            CHK_ERR(backwardNetwork(net, label_onehot, n_samples, "uint8", &args, &probe));
+            CHK_ERR(updateNetwork(net, &args, &probe));
 
             ++n_iters;
-            break;
+            fprintf(stdout, "finish n_iter = %d, ce_cost = %f\n", n_iters, probe.ce_cost);
+            //break;
         }
         CHK_ERR(gettimeofday(&t_epoch_1, NULL));
         timersub(&t_epoch_1, &t_epoch_0, &t_epoch_2);
-        fprintf(stdout, "epoch %d finish, total iters = %d, time elapsed: %lu.%06lus\n", n_epochs, n_iters, t_epoch_2.tv_sec, t_epoch_2.tv_usec);
+        fprintf(stdout, "epoch %d finish, n_iters = %d, ce_cod = %f, time elapsed: %lu.%06lus\n", n_epochs, n_iters, probe.ce_cost, t_epoch_2.tv_sec, t_epoch_2.tv_usec);
     }
     CHK_ERR(gettimeofday(&t_train_1, NULL));
     timersub(&t_train_1, &t_train_0, &t_train_2);
@@ -98,9 +106,9 @@ int main()
     destroyCECost(ce_cost);
     printf("layers destroy finish.\n");
 
-    destroyTensor(input);
-    destroyTensor(gt);
+    free(input);
     freeMnist(&dataset);
+    free(probe.p_class);
     printf("dataset free finish\n");
 
     printf("all finish.\n");

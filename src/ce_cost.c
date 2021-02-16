@@ -6,13 +6,13 @@
 #include "tensor.h"
 #include "cost.h"
 #include "ce_cost.h"
+#include "probe.h"
+#include "opt_alg.h"
 
 struct CECost
 {
     struct Cost base;
-    struct Tensor *p; // batch个样本的分类概率向量组成的矩阵
-    //struct Tensor *y_onehot; //根据p进行分类的结果，每一行是一个one-hot向量
-    //struct Tensor *y;
+    struct Tensor *p; // batch个样本的分类概率向量组成的矩阵, 在首次运行时动态创建，不会重复创建
 };
 
 int createCECost(struct CECost **c, int n_classes)
@@ -34,26 +34,49 @@ int createCECost(struct CECost **c, int n_classes)
 
 void destroyCECost(struct CECost *cost)
 {
-    //if (cost) {
-    //    destroyTensor(cost->y);
-    //}
+    if (cost) {
+        destroyTensor(cost->p);
+    }
     free(cost);
 }
 
-int forwardCECost(struct CECost *cost)
+int getCECostGroundTruthAttributes(int *n_features, enum DType *dtype, const struct CECost *cost)
 {
+    CHK_NIL(n_features);
+    CHK_NIL(dtype);
     CHK_NIL(cost);
-    CHK_ERR(softmaxTensor(cost->p, ((struct Cost *)cost)->input)); // 计算概率向量y
+
+    *n_features = ((const struct Cost *)cost)->n_input;
+    *dtype = UINT8;
+
     return SUCCESS;
 }
 
-int backwardCECost(struct CECost *cost, const struct Tensor *gt)
+int forwardCECost(struct CECost *cost, const struct UpdateArgs *args, struct Probe *probe)
+{
+    CHK_NIL(cost);
+    if (cost->p == NULL) {
+        int b;
+        CHK_ERR(getTensorBatch(&b, ((struct Cost *)cost)->input));
+        CHK_ERR(createTensor(&(cost->p), b, 1, ((struct Cost *)cost)->n_input, 1));
+    }
+    CHK_ERR(softmaxTensor(cost->p, ((struct Cost *)cost)->input)); // 计算概率向量y
+    if (probe->sw_p_class) {
+        CHK_ERR(copyTensorData(probe->p_class, FLOAT32, cost->p));
+    }
+    return SUCCESS;
+}
+
+int backwardCECost(struct CECost *cost, const struct Tensor *gt, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(cost);
     CHK_NIL(gt);
 
     CHK_ERR(addTensor2(((struct Cost *)cost)->delta, cost->p, gt)); // 计算反向传播的初始灵敏度delta
     CHK_ERR(probTensor(&(((struct Cost *)cost)->value), cost->p, gt)); // 计算代价值: batch的对数似然
+    if (probe->sw_ce_cost) {
+        probe->ce_cost = ((struct Cost *)cost)->value;
+    }
 
     return SUCCESS;
 }

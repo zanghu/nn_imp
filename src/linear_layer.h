@@ -3,6 +3,7 @@
 #include "tensor.h"
 #include "layer.h"
 #include "opt_alg.h"
+#include "probe.h"
 
 struct LinearLayer;
 /*
@@ -25,6 +26,6 @@ int getLinearLayerShape(int *n_in, int *n_out, const struct LinearLayer *layer);
 int getLinearLayerInputNumber(int *n_in, const struct LinearLayer *layer);
 int getLinearLayerOutputNumber(int *n_out, const struct LinearLayer *layer);
 
-int forwardLinearLayer(struct LinearLayer *layer);
-int backwardLinearLayer(struct LinearLayer *layer);
-int updateLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args);
+int forwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, struct Probe *probe);
+int backwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, struct Probe *probe);
+int updateLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, struct Probe *probe);
