@@ -14,14 +14,18 @@
 
 struct MNIST
 {
+    // oringinal data
     unsigned char *train_images;
     unsigned char *train_labels;
     unsigned char *test_images;
     unsigned char *test_labels;
 
-    float *train_images_float32;
-    float *test_images_float32;
+    // transformed data
+    float *train_images_norm;
     unsigned char *train_labels_onehot;
+    float *valid_images_norm;
+    unsigned char *valid_labels_onehot;
+    float *test_images_norm;
     unsigned char *test_labels_onehot;
 };
 
@@ -33,3 +37,4 @@ int getMnistNthBatch(const float *(*data_float), const unsigned char *(*label_on
 int getMnistNthBatchOrin(const unsigned char *(*data), const unsigned char *(*label), int *n_samples, const char *type, const struct MNIST *mnist, int n_use, int batch_size, int batch_idx);
 
 int dumpMnistToNumpyTxt(const struct MNIST *data, const char *dst_dir, unsigned int start, unsigned int end);
+int dumpMnistTransformed(const struct MNIST *mnist, const char *dst_dir);

@@ -7,3 +7,9 @@ https://www.quantstart.com/articles/Deep-Learning-with-Theano-Part-1-Logistic-Re
 
 3.lisa-lab的深度学习教程，珍贵的回忆
 https://github.com/lisa-lab/DeepLearningTutorials
+
+4.纯numpy的mlp
+https://github.com/meetvora/mlp-classifier.git
+
+5.Cerebras公司实现的mlp
+https://github.com/Cerebras/ccc
