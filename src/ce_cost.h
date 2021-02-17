@@ -6,7 +6,7 @@
 
 struct CECost;
 
-int createCECost(struct CECost **c, int n_classes);
+int createCECost(struct CECost **c, const char *name, int n_classes);
 void destroyCECost(struct CECost *cost);
 int getCECostGroundTruthAttributes(int *n_features, enum DType *dtype, const struct CECost *cost);
 

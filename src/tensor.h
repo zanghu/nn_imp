@@ -51,3 +51,9 @@ int addTensor(struct Tensor *x, struct Tensor *y, float lr, float momentum);
 int softmaxTensor(struct Tensor *output, const struct Tensor *input);
 int addTensor2(struct Tensor *delta, const struct Tensor *y, const struct Tensor *gt);
 int probTensor(float *val, const struct Tensor *p, const struct Tensor *gt);
+
+int openTensorLog(const char *log_path);
+int closeTensorLog();
+void logTensorParam(const struct Tensor *t);
+void logTensorData(const struct Tensor *t);
+void logTensorStr(const char *str);

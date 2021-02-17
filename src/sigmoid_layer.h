@@ -14,7 +14,7 @@ struct Sigmoid
 };
 */
 
-int createSigmoidLayer(struct SigmoidLayer **l, int n_neurons);
+int createSigmoidLayer(struct SigmoidLayer **l, const char *name, int n_neurons);
 void destroySigmoidLayer(struct SigmoidLayer *layer);
 
 int getSigmoidLayerShape(int *n_in, int *n_out, const struct SigmoidLayer *layer);

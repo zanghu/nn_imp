@@ -12,6 +12,7 @@ enum CostType
 
 struct Cost
 {
+    char name[64];
     enum CostType type;
     int n_input;
     float value; // 代价值

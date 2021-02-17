@@ -3,12 +3,39 @@
 #include <string.h>
 #include <math.h>
 #include <float.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "debug_macros.h"
 #include "math_utils.h"
 #include "activations.h"
 #include "gemm.h"
 #include "tensor.h"
+
+static FILE *g_fp = NULL;
+
+int openTensorLog(const char *log_path)
+{
+    CHK_NIL(log_path);
+    g_fp = fopen(log_path, "wb");
+    if (g_fp == NULL) {
+        ERR_MSG("fopen failed, detail: %s, error.\n", ERRNO_DETAIL(errno));
+        return ERR_COD;
+    }
+    fprintf(stdout, "g_fp open success.\n");
+    return SUCCESS;
+}
+
+int closeTensorLog()
+{
+    if (fclose(g_fp) == EOF) {
+        ERR_MSG("fclose failed, detail: %s, error.\n", ERRNO_DETAIL(errno));
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
 
 struct Tensor {
     enum DType dtype;
@@ -597,13 +624,15 @@ int sumTensorAxisCol(struct Tensor *z, const struct Tensor *x)
 
 // x = x + lr * y
 // y = momentum * (lr * y), 动量法，保存用作下一轮使用
+// 该方法专门为参数更新准备，因此不涉及tensor->b和tensor->n
 int addTensor(struct Tensor *x, struct Tensor *y, float lr, float momentum)
 {
     CHK_NIL(x);
     CHK_NIL(y);
 
     // STEP 0: prepare
-    int n = y->n * y->row * y->col * y->c;
+    //lr *= -1;
+    int n = y->row * y->col * y->c;
 #ifdef _DEBUG
     fprintf(stdout, "(y.b, y.row, y.col, y.c, y.n) = (%d, %d, %d, %d, %d)\n", y->b, y->row, y->col, y->c, y->n);
 #endif
@@ -701,13 +730,60 @@ int probTensor(float *val, const struct Tensor *p, const struct Tensor *gt)
     for (i = 0; i < n; ++i) {
         for (j = 0; j < c; ++j) {
             if (gt->data_u8[i * c + j] != 0) {
-                sum_log_p += p->data[i * c + j];
+                //sum_log_p += p->data[i * c + j];
+                sum_log_p += log(p->data[i * c + j]);
                 break;
             }
         }
     }
+    fprintf(stdout, "sum_log_p = %f, n = %d\n", sum_log_p, n);
     *val = sum_log_p / n; // 计算平均值, 用于观察评估寻俩效果的代价值建议与样本数无关
     return SUCCESS;
 }
- 
 
+static void log2d(const float *data, int m, int n, FILE *fp) {
+    char buf[64];
+    int len;
+    int i, j;
+    for (i = 0; i < m; ++i) {
+        for (j = 0; j < n; ++j) {
+            len = snprintf(buf, 64, "%f ", data[i * n + j]);
+            fwrite(buf, sizeof(char), len, fp);
+        }
+        fwrite("\n", sizeof(char), 1, fp);
+    }
+    fwrite("\n", sizeof(char), 1, fp); // 额外增加一个空行
+    fflush(fp);
+}
+ 
+static void log2dParam(const struct Tensor *t, FILE *fp)
+{
+    log2d(t->data, t->row, t->col, fp);
+}
+
+static void log2dData(const struct Tensor *t, FILE * fp)
+{
+    log2d(t->data, t->n, t->col, fp);
+}
+
+void logTensorParam(const struct Tensor *t)
+{
+    if (g_fp == NULL) return;
+    log2dParam(t, g_fp);
+}
+
+void logTensorData(const struct Tensor *t)
+{
+    if (g_fp == NULL) return;
+    log2dData(t, g_fp);
+}
+
+void logTensorStr(const char *str)
+{
+    if (g_fp == NULL) return;
+    int fd = fileno(g_fp);
+    if (write(fd, str, strlen(str) * sizeof(char)) == -1) {
+        ERR_MSG("write failed, detail: %s, error.\n", ERRNO_DETAIL(errno));
+    }
+    fsync(fd);
+}

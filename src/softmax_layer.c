@@ -16,7 +16,7 @@ struct SoftmaxLayer
     int n_neurons;
 };
 
-int createSoftmaxLayer(struct SoftmaxLayer **l, int n_neurons)
+int createSoftmaxLayer(struct SoftmaxLayer **l, const char *name, int n_neurons)
 {
     CHK_NIL(l);
     CHK_ERR((n_neurons > 0)? 0: 1);
@@ -28,6 +28,10 @@ int createSoftmaxLayer(struct SoftmaxLayer **l, int n_neurons)
     }
     ((struct Layer *)layer)->type = SOFTMAX_LAYER_TYPE;
     layer->n_neurons = n_neurons;
+
+    if (name) {
+        snprintf(((struct Layer *)layer)->name, 64, "%s", name);
+    }
 
     *l = layer;
     return SUCCESS;

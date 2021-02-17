@@ -18,7 +18,7 @@ struct SigmoidLayer
     int n_neurons;
 };
 
-int createSigmoidLayer(struct SigmoidLayer **l, int n_neurons)
+int createSigmoidLayer(struct SigmoidLayer **l, const char *name, int n_neurons)
 {
     CHK_NIL(l);
     CHK_ERR((n_neurons > 0)? 0: 1);
@@ -30,6 +30,10 @@ int createSigmoidLayer(struct SigmoidLayer **l, int n_neurons)
     }
     ((struct Layer *)layer)->type = SIGMOID_LAYER_TYPE;
     layer->n_neurons = n_neurons;
+
+    if (name) {
+        snprintf(((struct Layer *)layer)->name, 64, "%s", name);
+    }
 
     *l = layer;
     return SUCCESS;

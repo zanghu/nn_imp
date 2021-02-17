@@ -19,7 +19,7 @@ struct LinearLayer
 };
 */
 
-int createLinearLayer(struct LinearLayer **l, int n_in, int n_out);
+int createLinearLayer(struct LinearLayer **l, const char *name, int n_in, int n_out);
 void destroyLinearLayer(struct LinearLayer *layer);
 
 int getLinearLayerShape(int *n_in, int *n_out, const struct LinearLayer *layer);

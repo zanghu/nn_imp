@@ -14,6 +14,7 @@ enum LayerType
 
 struct Layer
 {
+    char name[64];
     enum LayerType type;
 
     // ref only, memory not own 
@@ -21,9 +22,6 @@ struct Layer
     struct Tensor *output;
     struct Tensor *delta_in;
     struct Tensor *delta_out;
-
-    //float lr;
-    //float momentum;
 };
 
 int forwardLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe *probe);

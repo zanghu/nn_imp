@@ -15,7 +15,7 @@ struct CECost
     struct Tensor *p; // batch个样本的分类概率向量组成的矩阵, 在首次运行时动态创建，不会重复创建
 };
 
-int createCECost(struct CECost **c, int n_classes)
+int createCECost(struct CECost **c, const char *name, int n_classes)
 {
     CHK_NIL(c);
     CHK_ERR((n_classes > 0)? 0: 1);
@@ -27,6 +27,10 @@ int createCECost(struct CECost **c, int n_classes)
     }
     ((struct Cost *)cost)->type = CE_COST_TYPE;
     ((struct Cost *)cost)->n_input = n_classes;
+
+    if (name) {
+        snprintf(((struct Cost *)(cost))->name, 64, "%s", name);
+    }
 
     *c = cost;
     return SUCCESS;

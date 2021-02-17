@@ -158,6 +158,7 @@ static int reallocNetworkCache(struct Network *net, const struct UpdateArgs *arg
     }
 
     if (need_realloc) {
+        fprintf(stdout, "Network need to be reallocate for some reason...\n");
         freeNetworkCache(net);
         CHK_ERR(allocNetworkCache(net, args));
     }

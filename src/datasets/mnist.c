@@ -11,20 +11,19 @@
 #include "data_utils.h"
 #include "mnist.h"
 
-// mnist original file names
-static const char *s_train_images = "train-images-idx3-ubyte";
-static const char *s_train_labels = "train-labels-idx1-ubyte";
-static const char *s_test_images = "t10k-images-idx3-ubyte";
-static const char *s_test_labels = "t10k-labels-idx1-ubyte";
+#define MNIST_IMG_OFFSET (16)
+#define MNIST_LABEL_OFFSET (8)
 
-// mnist file size
-static const unsigned int s_size_train_img = MNIST_N_TEST + MNIST_WIDTH * MNIST_HEIGHT * MNIST_N_TRAIN;
-static const unsigned int s_size_train_label = MNIST_LABEL_OFFSET + MNIST_N_TRAIN * 1;
-static const unsigned int s_size_test_img = MNIST_N_TEST + MNIST_WIDTH * MNIST_HEIGHT * MNIST_N_TEST;
-static const unsigned int s_size_test_label = MNIST_LABEL_OFFSET + MNIST_N_TEST * 1;
+// mnist original file names
+#define MNIST_TRAIN_IMAGES_NAME ("train-images-idx3-ubyte")
+#define MNIST_TRAIN_LABELS_NAME ("train-labels-idx1-ubyte")
+#define MNIST_TEST_IMAGES_NAME  ("t10k-images-idx3-ubyte")
+#define MNIST_TEST_LABELS_NAME  ("t10k-labels-idx1-ubyte")
+
+#define NORM_CONST (255)
 
 // 用法：声明栈变量data, load(&data, src_dir)
-int loadMnist(struct MNIST *data, const char *src_dir)
+int loadMnistAll(struct MNIST *data, const char *src_dir)
 {
     CHK_NIL(data);
     CHK_NIL(src_dir);
@@ -34,9 +33,10 @@ int loadMnist(struct MNIST *data, const char *src_dir)
 
     int fd = -1;
     int i;
-    unsigned char *results[6] = {NULL, NULL, NULL, NULL, NULL, NULL};
-    const char *names[4] = {s_train_images, s_train_labels, s_test_images, s_test_labels};
-    const unsigned int sizes[4] = {s_size_train_img, s_size_train_label, s_size_test_img, s_size_test_label};
+    void *results[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+    const char *names[4] = {MNIST_TRAIN_IMAGES_NAME, MNIST_TRAIN_LABELS_NAME, MNIST_TEST_IMAGES_NAME, MNIST_TEST_LABELS_NAME};
+    const unsigned int offsets[4] = {MNIST_IMG_OFFSET, MNIST_LABEL_OFFSET, MNIST_IMG_OFFSET, MNIST_LABEL_OFFSET};
+    const unsigned int sizes[4] = {MNIST_WIDTH * MNIST_HEIGHT * MNIST_N_TRAIN, MNIST_N_TRAIN, MNIST_WIDTH * MNIST_HEIGHT * MNIST_N_TEST, MNIST_N_TEST};
 
     char path[1024];
     for (i = 0; i < 4; ++i) {
@@ -48,14 +48,19 @@ int loadMnist(struct MNIST *data, const char *src_dir)
             goto err_end;
         }
 
-        results[i] = calloc(s_size_train_img, sizeof(unsigned char)); // alloc memory
+        results[i] = calloc(sizes[i], sizeof(unsigned char)); // alloc memory
         if (results[i] == NULL) {
-            ERR_MSG("read() failed, %s, error.\n", ERRNO_DETAIL(errno));
+            ERR_MSG("calloc() failed, %s, error.\n", ERRNO_DETAIL(errno));
+            goto err_end;
+        }
+
+        if (lseek(fd, offsets[i], SEEK_SET) == -1) { // skip the data header
+            ERR_MSG("lseek() failed, %s, error.\n", ERRNO_DETAIL(errno));
             goto err_end;
         }
 
         if (read(fd, results[i], sizes[i] * sizeof(unsigned char)) == -1) {; // read bytes
-            ERR_MSG("read() failed, %s, error.\n", ERRNO_DETAIL(errno));
+            ERR_MSG("calloc() failed, %s, error.\n", ERRNO_DETAIL(errno));
             goto err_end;
         }
 
@@ -64,8 +69,22 @@ int loadMnist(struct MNIST *data, const char *src_dir)
             goto err_end;
         }
     }
-    CHK_ERR_GOTO(transformOnehot((void **)(&(results[4])), "uint8", results[1] + MNIST_LABEL_OFFSET, "uint8", MNIST_N_TRAIN, MNIST_N_CLASSES));
-    CHK_ERR_GOTO(transformOnehot((void **)(&(results[5])), "uint8", results[3] + MNIST_LABEL_OFFSET, "uint8", MNIST_N_TEST, MNIST_N_CLASSES));
+
+    int n_train_elems = MNIST_N_TRAIN * MNIST_HEIGHT * MNIST_WIDTH; 
+    if ((results[4] = calloc(n_train_elems, sizeof(float))) == NULL) {
+        ERR_MSG("calloc() failed, detail: %s, error.\n", ERRNO_DETAIL(errno));
+        goto err_end;
+    }
+    int n_test_elems = MNIST_N_TEST * MNIST_HEIGHT * MNIST_WIDTH; 
+    if ((results[6] = calloc(n_test_elems, sizeof(float))) == NULL) {
+        ERR_MSG("calloc() failed, detail: %s, error.\n", ERRNO_DETAIL(errno));
+        goto err_end;
+    }
+    CHK_ERR_GOTO(transformToFloat32FromUint8((float *)(results[4]), (unsigned char *)(results[0]), n_train_elems, NORM_CONST));
+    CHK_ERR_GOTO(transformToFloat32FromUint8((float *)(results[6]), (unsigned char *)(results[2]), n_test_elems, NORM_CONST));
+
+    CHK_ERR_GOTO(transformOnehot((void **)(&(results[5])), "uint8", results[1], "uint8", MNIST_N_TRAIN, MNIST_N_CLASSES));
+    CHK_ERR_GOTO(transformOnehot((void **)(&(results[7])), "uint8", results[3], "uint8", MNIST_N_TEST, MNIST_N_CLASSES));
 
     CHK_ERR_GOTO(gettimeofday(&t1, NULL));
     timersub(&t1, &t0, &t2);
@@ -76,13 +95,15 @@ int loadMnist(struct MNIST *data, const char *src_dir)
     data->train_labels = results[1];
     data->test_images = results[2];
     data->test_labels = results[3];
-    data->train_labels_onehot = results[4];
-    data->test_labels_onehot = results[5];
+    data->train_images_float32 = results[4];
+    data->train_labels_onehot = results[5];
+    data->test_images_float32 = results[6];
+    data->test_labels_onehot = results[7];
 
     return SUCCESS;
 
 err_end:
-    for (i = 0; i < 6; ++i) {
+    for (i = 0; i < 8; ++i) {
         free(results[i]);
     }
     if (close(fd) == -1) {
@@ -92,6 +113,21 @@ err_end:
         }
     }
     return ERR_COD;
+}
+
+int loadMnist(struct MNIST *mnist, const char *src_dir)
+{
+    CHK_ERR(loadMnistAll(mnist, src_dir));
+    free(mnist->train_images);
+    free(mnist->train_labels);
+    free(mnist->test_images);
+    free(mnist->test_labels);
+    mnist->train_images = NULL;
+    mnist->train_labels = NULL;
+    mnist->test_images = NULL;
+    mnist->test_labels = NULL;
+
+    return 0;
 }
 
 void freeMnist(struct MNIST *data)
@@ -106,6 +142,7 @@ void freeMnist(struct MNIST *data)
     }
 }
 
+/*
 int getMnistTrainBatchNumber(int *n_batches, int batch_size)
 {
     CHK_NIL(n_batches);
@@ -118,12 +155,12 @@ int getMnistTrainBatchNumber(int *n_batches, int batch_size)
     *n_batches = ret;
     return SUCCESS;
 }
+*/
 
 /**
  * @brief 取出指定序号的batch的训练数据
  *
- * @param data          返回参数, 图片数据读取的起始位置
- * @param label         返回参数, 类标数据读取的起始位置
+ * @param data_float    返回参数, 图片数据读取的起始位置
  * @param label_onehot  返回参数, onehot格式类标数据读取的起始位置
  * @param n_samples     返回参数, 读取的样本数，可能小于batch_size
  * @param type          输入参数, 数据来自训练集还是测试集
@@ -132,29 +169,93 @@ int getMnistTrainBatchNumber(int *n_batches, int batch_size)
  * @param batch_size    输入参数, 每个batch包含的样本数
  * @param batch_idx     输入参数, 本次取索引为batch_idx的batch 
  */
-int getMnistNthBatch(const unsigned char *(*data), const unsigned char *(*label), const unsigned char *(*label_onehot), int *n_samples, const char *type, const struct MNIST *mnist, int n_use, int batch_size, int batch_idx)
+int getMnistNthBatch(const float *(*data_float), const unsigned char *(*label_onehot), int *n_samples, const char *type, const struct MNIST *mnist, int n_use, int batch_size, int batch_idx)
 {
-    CHK_NIL(data);
+    CHK_NIL(data_float);
+    CHK_NIL(label_onehot);
     CHK_NIL(type);
     CHK_NIL(n_samples);
     CHK_NIL(mnist);
     CHK_ERR((batch_size > 0)? 0: 1);
     CHK_ERR((batch_idx >= 0)? 0: 1);
     CHK_ERR((n_use > 0)? 0: 1);
+    CHK_NIL(mnist->train_images_float32);
+    CHK_NIL(mnist->train_labels_onehot);
+    CHK_NIL(mnist->test_images_float32);
+    CHK_NIL(mnist->test_labels_onehot);
+
+    float *data_all = NULL;
+    unsigned char *label_onehot_all = NULL;
+    if (strcasecmp(type, "train") == 0) {
+        CHK_ERR((n_use < MNIST_N_TRAIN)? 0: 1); 
+        data_all = mnist->train_images_float32;
+        label_onehot_all = mnist->train_labels_onehot;
+    } else if (strcasecmp(type, "test") == 0) {
+        CHK_ERR((n_use < MNIST_N_TEST)? 0: 1); 
+        data_all = mnist->test_images_float32;
+        label_onehot_all = mnist->test_labels_onehot;
+    } else {
+        ERR_MSG("MNIST type: %s is not supported, error.\n", type);
+        return ERR_COD;
+    }
+
+    if(batch_idx * batch_size >= n_use) { // 训练循环的一个epoch结束的标识
+        *data_float = NULL;
+        *label_onehot = NULL;
+        return SUCCESS;
+    }
+
+    int offset_data = batch_idx * batch_size * MNIST_WIDTH * MNIST_HEIGHT;
+    *data_float = data_all + offset_data;
+    int offset_label = batch_idx * batch_size * MNIST_N_CLASSES; // 注意: onehot类标中头部没有偏移量MNIST_LABEL_OFFSET
+    *label_onehot = label_onehot_all + offset_label;
+
+    if ((batch_idx + 1) * batch_size > n_use) {
+        *n_samples = n_use - batch_idx * batch_size;
+    }
+    else {
+        *n_samples = batch_size;
+    }
+    return SUCCESS;
+}
+
+/**
+ * @brief 取出指定序号的batch的训练数据
+ *
+ * @param data          返回参数, 图片数据读取的起始位置
+ * @param label         返回参数, 类标数据读取的起始位置
+ * @param n_samples     返回参数, 读取的样本数，可能小于batch_size
+ * @param type          输入参数, 数据来自训练集还是测试集
+ * @param mnist         输入参数, 完成初始化的数据集对象
+ * @param n_train       输入参数, 用作训练样本的总数, 即索引在[0, n_train)区间的样本作为训练集 
+ * @param batch_size    输入参数, 每个batch包含的样本数
+ * @param batch_idx     输入参数, 本次取索引为batch_idx的batch 
+ */
+int getMnistNthBatchOrin(const unsigned char *(*data), const unsigned char *(*label), int *n_samples, const char *type, const struct MNIST *mnist, int n_use, int batch_size, int batch_idx)
+{
+    CHK_NIL(data);
+    CHK_NIL(label);
+    CHK_NIL(type);
+    CHK_NIL(n_samples);
+    CHK_NIL(mnist);
+    CHK_ERR((batch_size > 0)? 0: 1);
+    CHK_ERR((batch_idx >= 0)? 0: 1);
+    CHK_ERR((n_use > 0)? 0: 1);
+    CHK_NIL(mnist->train_images);
+    CHK_NIL(mnist->train_labels);
+    CHK_NIL(mnist->test_images);
+    CHK_NIL(mnist->test_labels);
 
     unsigned char *data_all = NULL;
     unsigned char *label_all = NULL;
-    unsigned char *label_onehot_all = NULL;
     if (strcasecmp(type, "train") == 0) {
         CHK_ERR((n_use < MNIST_N_TRAIN)? 0: 1); 
         data_all = mnist->train_images;
         label_all = mnist->train_labels;
-        label_onehot_all = mnist->train_labels_onehot;
     } else if (strcasecmp(type, "test") == 0) {
         CHK_ERR((n_use < MNIST_N_TEST)? 0: 1); 
         data_all = mnist->test_images;
         label_all = mnist->test_labels;
-        label_onehot_all = mnist->test_labels_onehot;
     } else {
         ERR_MSG("MNIST type: %s is not supported, error.\n", type);
         return ERR_COD;
@@ -163,18 +264,14 @@ int getMnistNthBatch(const unsigned char *(*data), const unsigned char *(*label)
     if(batch_idx * batch_size >= n_use) { // 训练循环的一个epoch结束的标识
         *data = NULL;
         *label = NULL;
+        return SUCCESS;
     }
 
-    int offset_data = MNIST_IMG_OFFSET + batch_idx * batch_size * MNIST_WIDTH * MNIST_HEIGHT;
+    int offset_data = batch_idx * batch_size * MNIST_WIDTH * MNIST_HEIGHT;
     *data = data_all + offset_data;
-    if (label) {
-        int offset_label = MNIST_LABEL_OFFSET + batch_idx * batch_size * 1;
-        *label = label_all + offset_label;
-    }
-    if (label_onehot) {
-        int offset_label = batch_idx * batch_size * MNIST_N_CLASSES; // 注意: onehot类标中头部没有偏移量MNIST_LABEL_OFFSET
-        *label_onehot = label_onehot_all + offset_label;
-    }
+    int offset_label = batch_idx * batch_size;
+    *label = label_all + offset_label;
+
     if ((batch_idx + 1) * batch_size > n_use) {
         *n_samples = n_use - batch_idx * batch_size;
     }
@@ -224,7 +321,7 @@ int dumpMnistNumpyTxt(const struct MNIST *data, const char * type, const char *d
         int offset = 0;
         for (j = 0; j < MNIST_HEIGHT; ++j) {
             for (k = 0; k < MNIST_WIDTH; ++k) {
-                offset += snprintf(img + offset, 4096 - offset, "%u ", (unsigned int)(images[ MNIST_IMG_OFFSET + MNIST_HEIGHT * MNIST_WIDTH * i + j * MNIST_WIDTH + k]));
+                offset += snprintf(img + offset, 4096 - offset, "%u ", (unsigned int)(images[MNIST_HEIGHT * MNIST_WIDTH * i + j * MNIST_WIDTH + k]));
             }
             offset += snprintf(img + offset, 4096 - offset, "%s", "\n");
         }

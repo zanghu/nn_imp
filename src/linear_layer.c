@@ -22,7 +22,7 @@ struct LinearLayer
     struct Tensor *b_grad;;
 };
 
-int createLinearLayer(struct LinearLayer **l, int n_in, int n_out)
+int createLinearLayer(struct LinearLayer **l, const char *name, int n_in, int n_out)
 {
     CHK_NIL(l);
     CHK_ERR((n_in > 0)? 0: 1);
@@ -34,6 +34,9 @@ int createLinearLayer(struct LinearLayer **l, int n_in, int n_out)
         return ERR_COD;
     }
     ((struct Layer *)layer)->type = LINEAR_LAYER_TYPE;
+    if (name) {
+        snprintf(((struct Layer *)layer)->name, 64, "%s", name);
+    }
 
     // Weight
     CHK_ERR_GOTO(createTensor(&(layer->w), 1, n_out, n_in, 1)); // outputs * inputs，布局与yolov2保持一致
@@ -138,9 +141,23 @@ int updateLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, 
     CHK_NIL(layer);
     CHK_NIL(args);
 
+    logTensorStr("@Before Paramter Update=========================\n");
+
+    logTensorStr("Linear Weight:\n");
+    logTensorParam(layer->w);
+    logTensorStr("Linear Bias:\n");
+    logTensorParam(layer->b);
+
+    logTensorStr("Linear Weight Gradient:\n");
+    logTensorParam(layer->w_grad);
+    logTensorStr("Linear Bias Gradient:\n");
+    logTensorParam(layer->b_grad);
+
+    logTensorStr("\n");
+
     // 注意：这里的lr应该是已经除以了batch_size后的lr
-    CHK_ERR(addTensor(layer->w, layer->w_grad, args->lr / args->batch_size, args->momentum));
-    CHK_ERR(addTensor(layer->b, layer->b_grad, args->lr / args->batch_size, args->momentum));
+    CHK_ERR(addTensor(layer->w, layer->w_grad, -1 * (args->lr) / (args->batch_size), args->momentum));
+    CHK_ERR(addTensor(layer->b, layer->b_grad, -1 * (args->lr) / (args->batch_size), args->momentum));
 
     return SUCCESS;
 }
