@@ -3,6 +3,7 @@
 #include "tensor.h"
 #include "probe.h"
 #include "opt_alg.h"
+#include "const.h"
 
 enum CostType
 {
@@ -12,7 +13,8 @@ enum CostType
 
 struct Cost
 {
-    char name[64];
+    int idx;
+    char name[NN_COST_NAME_LEN];
     enum CostType type;
     int n_input;
     float value; // 代价值
@@ -25,6 +27,8 @@ struct Cost
 int getCostInputNumber(int *n_in, const struct Cost *cost);
 int getCostValue(float *val, const struct Cost *cost);
 int getCostGroundTruthAttributes(int *n_features, enum DType *dtype, const struct Cost *cost);
+int setCostName(struct Cost *cost, const char *name);
+int setCostIndex(struct Cost *cost, int idx);
 int setCostInput(struct Cost *cost, const struct Tensor *input);
 int setCostDelta(struct Cost *cost, const struct Tensor *delta);
 

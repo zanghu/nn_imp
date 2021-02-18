@@ -215,6 +215,22 @@ int getLayerOutputNumber(int *n_out, const struct Layer *layer)
     return SUCCESS;
 }
 
+int setLayerName(struct Layer *layer, const char *name)
+{
+    CHK_NIL(layer);
+    CHK_NIL(name);
+
+    snprintf(layer->name, NN_LAYER_NAME_LEN, "%s", name);
+
+    return SUCCESS;
+}
+
+int setLayerIndex(struct Layer *layer, int idx)
+{
+    CHK_NIL(layer);
+    layer->idx = idx;
+    return SUCCESS;
+}
 
 int setLayerInput(struct Layer *layer, const struct Tensor *input)
 {

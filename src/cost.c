@@ -83,6 +83,22 @@ int getCostGroundTruthAttributes(int *n_features, enum DType *dtype, const struc
     return SUCCESS;
 }
 
+int setCostName(struct Cost *cost, const char *name)
+{
+    CHK_NIL(cost);
+    CHK_NIL(name);
+
+    snprintf(cost->name, NN_COST_NAME_LEN, "%s", name);
+    return SUCCESS;
+}
+
+int setCostIndex(struct Cost *cost, int idx)
+{
+    CHK_NIL(cost);
+    cost->idx = idx;
+    return SUCCESS;
+}
+
 int forwardCost(struct Cost *cost, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(cost);

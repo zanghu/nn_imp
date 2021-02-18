@@ -29,5 +29,6 @@ gcc -g -Wall -O2 \
     $SRC_DIR/tensor.c \
     $SRC_DIR/gemm.c \
     $SRC_DIR/math_utils.c \
+    $SRC_DIR/io_utils.c \
     $SRC_DIR/debug_macros.c \
     -o $LIB_DIR/libnn.so

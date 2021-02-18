@@ -6,6 +6,3 @@ int transformToFloat32FromUint8(float *dst, const unsigned char *src, int n_elem
 int getDataMean(double *mean, const void *data, const char *dtype, int n_elems);
 int getDataStd(double *std, const void *data, const char *dtype, int n_elems);
 int getDataNormalization(void *data, const char *dtype, int n_elems, double mean, double std);
-
-int savetxtDataFlot32(const char *pth, const float *data, int n_samples, int n_features);
-int savetxtDataUint8(const char *pth, const unsigned char *data, int n_samples, int n_features);

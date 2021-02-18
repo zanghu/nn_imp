@@ -8,6 +8,7 @@
 #include "activations.h"
 #include "layer.h"
 #include "sigmoid_layer.h"
+#include "const.h"
 
 
 struct SoftmaxLayer
@@ -30,7 +31,7 @@ int createSoftmaxLayer(struct SoftmaxLayer **l, const char *name, int n_neurons)
     layer->n_neurons = n_neurons;
 
     if (name) {
-        snprintf(((struct Layer *)layer)->name, 64, "%s", name);
+        snprintf(((struct Layer *)layer)->name, NN_LAYER_NAME_LEN, "%s", name);
     }
 
     *l = layer;

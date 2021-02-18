@@ -9,6 +9,7 @@
 #include "linear_layer.h"
 #include "opt_alg.h"
 #include "probe.h"
+#include "const.h"
 
 
 struct LinearLayer
@@ -35,7 +36,7 @@ int createLinearLayer(struct LinearLayer **l, const char *name, int n_in, int n_
     }
     ((struct Layer *)layer)->type = LINEAR_LAYER_TYPE;
     if (name) {
-        snprintf(((struct Layer *)layer)->name, 64, "%s", name);
+        snprintf(((struct Layer *)layer)->name, NN_LAYER_NAME_LEN, "%s", name);
     }
 
     // Weight
@@ -110,6 +111,10 @@ int forwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args,
 
     CHK_ERR(linearTensor(((struct Layer *)layer)->output, ((struct Layer *)layer)->input, 0, layer->w, 1, layer->b));
 
+    if (probe->dump_output) {
+        CHK_ERR(savetxtTensorData(((struct Layer *)layer)->output, probe->dst_dir, "output", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
+    }
+
     return SUCCESS;
 }
 
@@ -123,12 +128,21 @@ int backwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args
     // backward propagation
     if (((struct Layer *)layer)->delta_out) { // 反向传播到达layer[0]时，delta_out为NULL
         CHK_ERR(linearTensor1(((struct Layer *)layer)->delta_out, ((struct Layer *)layer)->delta_in, 0, layer->w, 0, NULL));
+
+        if (probe->dump_delta) {
+            CHK_ERR(savetxtTensorData(((struct Layer *)layer)->delta_out, probe->dst_dir, "delta", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
+        }
     }
 
     // update gradient
     CHK_ERR(linearTensor2(layer->w_grad, ((struct Layer *)layer)->delta_in, 1, ((struct Layer *)layer)->input, 0, NULL)); // update weight gradient
-    //CHK_ERR(mulTensorPointwiseAndSum(layer->b_grad, ((struct Layer *)layer)->delta_in, ((struct Layer *)layer)->input)); // update bias gradient
+    if (probe->dump_gw) {
+        CHK_ERR(savetxtTensorParam(layer->w_grad, probe->dst_dir, "gW", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
+    }
     CHK_ERR(sumTensorAxisCol(layer->b_grad, ((struct Layer *)layer)->delta_in)); // update bias gradient
+    if (probe->dump_gb) {
+        CHK_ERR(savetxtTensorParam(layer->b_grad, probe->dst_dir, "gb", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
+    }
 
     return SUCCESS;
 }
@@ -140,7 +154,7 @@ int updateLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, 
 {
     CHK_NIL(layer);
     CHK_NIL(args);
-
+/*
     logTensorStr("@Before Paramter Update=========================\n");
 
     logTensorStr("Linear Weight:\n");
@@ -154,10 +168,15 @@ int updateLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, 
     logTensorParam(layer->b_grad);
 
     logTensorStr("\n");
-
+*/
     // 注意：这里的lr应该是已经除以了batch_size后的lr
     CHK_ERR(addTensor(layer->w, layer->w_grad, -1 * (args->lr) / (args->batch_size), args->momentum));
+    if (probe->dump_w) {
+        CHK_ERR(savetxtTensorParam(layer->w, probe->dst_dir, "W", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
+    }
     CHK_ERR(addTensor(layer->b, layer->b_grad, -1 * (args->lr) / (args->batch_size), args->momentum));
-
+    if (probe->dump_b) {
+        CHK_ERR(savetxtTensorParam(layer->b, probe->dst_dir, "b", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
+    }
     return SUCCESS;
 }

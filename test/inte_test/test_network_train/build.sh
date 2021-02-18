@@ -44,6 +44,7 @@ gcc $CFLAGS \
     $SRC_DIR/tensor.c \
     $SRC_DIR/gemm.c \
     $SRC_DIR/math_utils.c \
+    $SRC_DIR/io_utils.c \
     $SRC_DIR/debug_macros.c \
     $LIB_CMD \
     -o Test

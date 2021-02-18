@@ -8,6 +8,7 @@
 #include "ce_cost.h"
 #include "probe.h"
 #include "opt_alg.h"
+#include "const.h"
 
 struct CECost
 {
@@ -29,7 +30,7 @@ int createCECost(struct CECost **c, const char *name, int n_classes)
     ((struct Cost *)cost)->n_input = n_classes;
 
     if (name) {
-        snprintf(((struct Cost *)(cost))->name, 64, "%s", name);
+        snprintf(((struct Cost *)(cost))->name, NN_LAYER_NAME_LEN, "%s", name);
     }
 
     *c = cost;

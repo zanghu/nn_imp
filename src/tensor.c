@@ -13,6 +13,8 @@
 #include "activations.h"
 #include "gemm.h"
 #include "tensor.h"
+#include "io_utils.h"
+#include "const.h"
 
 static FILE *g_fp = NULL;
 
@@ -786,4 +788,56 @@ void logTensorStr(const char *str)
         ERR_MSG("write failed, detail: %s, error.\n", ERRNO_DETAIL(errno));
     }
     fsync(fd);
+}
+
+int savetxtTensorData(const struct Tensor *t, const char *dst_dir, const char *prefix, const char *name, int n_epoch, int n_iter)
+{
+    CHK_NIL(t);
+    CHK_NIL(dst_dir);
+    CHK_NIL(prefix);
+    CHK_NIL(name);
+
+    char pth[NN_PATH_LEN];
+    snprintf(pth, NN_PATH_LEN, "%s/%s_epoch_%03d_iter_%03d_%s_%dx%d.txt", dst_dir, name, n_epoch, n_iter, prefix, t->row, t->col);
+    switch (t->dtype) {
+        case FLOAT32:
+        CHK_ERR(savetxtMatrixFlot32(pth, t->data, t->b, t->col));
+        break;
+
+        case UINT8:
+        CHK_ERR(savetxtMatrixUint8(pth, t->data_u8, t->b, t->col));
+        break;
+
+        default:
+        ERR_MSG("Tensor dtype: %s not supported yet, error.\n", getTensorDtypeStrFromEnum(t->dtype));
+        return ERR_COD;
+    }
+
+    return SUCCESS;
+}
+
+int savetxtTensorParam(const struct Tensor *t, const char *dst_dir, const char *prefix, const char *name, int n_epoch, int n_iter)
+{
+    CHK_NIL(t);
+    CHK_NIL(dst_dir);
+    CHK_NIL(prefix);
+    CHK_NIL(name);
+
+    char pth[NN_PATH_LEN];
+    snprintf(pth, NN_PATH_LEN, "%s/%s_epoch_%03d_iter_%03d_%s_%dx%d.txt", dst_dir, name, n_epoch, n_iter, prefix, t->row, t->col);
+    
+    switch (t->dtype) {
+        case FLOAT32:
+        CHK_ERR(savetxtMatrixFlot32(pth, t->data, t->row, t->col));
+        break;
+
+        case UINT8:
+        CHK_ERR(savetxtMatrixUint8(pth, t->data_u8, t->row, t->col));
+        break;
+
+        default:
+        ERR_MSG("Tensor dtype: %s not supported yet, error.\n", getTensorDtypeStrFromEnum(t->dtype));
+        return ERR_COD;
+    }
+    return SUCCESS;
 }

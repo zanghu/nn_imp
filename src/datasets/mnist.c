@@ -9,6 +9,7 @@
 
 #include "debug_macros.h"
 #include "data_utils.h"
+#include "io_utils.h"
 #include "mnist.h"
 
 #define MNIST_IMG_OFFSET (16)
@@ -397,12 +398,12 @@ int dumpMnistTransformed(const struct MNIST *mnist, const char *dst_dir)
     snprintf(test_data_txt, 1024, "%s/mnist_test_images_transformed.txt", dst_dir);
     snprintf(test_label_txt, 1024, "%s/mnist_test_label_transformed.txt", dst_dir);
 
-    CHK_ERR(savetxtDataFlot32(train_data_txt, mnist->train_images_norm, 50000, MNIST_HEIGHT * MNIST_WIDTH));
-    CHK_ERR(savetxtDataUint8(train_label_txt, mnist->train_labels_onehot, 50000, MNIST_N_CLASSES));
-    CHK_ERR(savetxtDataFlot32(valid_data_txt, mnist->valid_images_norm, 10000, MNIST_HEIGHT * MNIST_WIDTH));
-    CHK_ERR(savetxtDataUint8(valid_label_txt, mnist->valid_labels_onehot, 10000, MNIST_N_CLASSES));
-    CHK_ERR(savetxtDataFlot32(test_data_txt, mnist->test_images_norm, MNIST_N_TEST, MNIST_HEIGHT * MNIST_WIDTH));
-    CHK_ERR(savetxtDataUint8(test_label_txt, mnist->test_labels_onehot, MNIST_N_TEST, MNIST_N_CLASSES));
+    CHK_ERR(savetxtMatrixFlot32(train_data_txt, mnist->train_images_norm, 50000, MNIST_HEIGHT * MNIST_WIDTH));
+    CHK_ERR(savetxtMatrixUint8(train_label_txt, mnist->train_labels_onehot, 50000, MNIST_N_CLASSES));
+    CHK_ERR(savetxtMatrixFlot32(valid_data_txt, mnist->valid_images_norm, 10000, MNIST_HEIGHT * MNIST_WIDTH));
+    CHK_ERR(savetxtMatrixUint8(valid_label_txt, mnist->valid_labels_onehot, 10000, MNIST_N_CLASSES));
+    CHK_ERR(savetxtMatrixFlot32(test_data_txt, mnist->test_images_norm, MNIST_N_TEST, MNIST_HEIGHT * MNIST_WIDTH));
+    CHK_ERR(savetxtMatrixUint8(test_label_txt, mnist->test_labels_onehot, MNIST_N_TEST, MNIST_N_CLASSES));
 
     return SUCCESS;
 }

@@ -14,6 +14,14 @@
  */
 #pragma once
 
+/*
+struct Conditon
+{
+    const char name[32];
+    const char type[32];
+};
+*/
+
 struct Probe
 {
     int sw_p_class; // 计算分类概率
@@ -22,4 +30,15 @@ struct Probe
     float ce_cost;
     int sw_sq_cost; // 计算平方损失代价
     float sq_cost;
+    
+    char *dst_dir;
+    int dump_w; // 导出层的参数
+    int dump_b; // 导出层的参数
+
+    int dump_gw; // 导出层的梯度
+    int dump_gb; // 导出层的梯度
+
+    int dump_output; // 导出层的输出
+
+    int dump_delta; // 导出层的灵敏度
 };
