@@ -25,7 +25,7 @@ int main()
     struct LinearLayer *linear_0 = NULL;
     CHK_ERR(createLinearLayer(&linear_0, "LIN_L0", 28 * 28, 625));
     struct SigmoidLayer *sigmoid_0 = NULL;
-    CHK_ERR(createSigmoidLayer(&sigmoid_0, "SIG_L0", 625));
+    CHK_ERR(createSigmoidLayer(&sigmoid_0, "SIG_L0"));
     struct LinearLayer *linear_1 = NULL;
     CHK_ERR(createLinearLayer(&linear_1, "LIN_L1", 625, 10));
     struct CECost *ce_cost = NULL;
@@ -88,13 +88,13 @@ int main()
             }
 
             // 训练
-            CHK_ERR(forwardNetwork(net, data_batch, n_samples, "float32", &args, &probe));
-            CHK_ERR(backwardNetwork(net, label_onehot, n_samples, "uint8", &args, &probe));
+            CHK_ERR(forwardNetwork(net, data_batch, n_samples, 28 * 28, "float32", &args, &probe));
+            CHK_ERR(backwardNetwork(net, label_onehot, n_samples, 10, "uint8", &args, &probe));
             CHK_ERR(updateNetwork(net, &args, &probe));
 
             ++n_iters;
             fprintf(stdout, "finish n_iter = %d, ce_cost = %f\n", n_iters, probe.ce_cost);
-            if (n_iters == 2) {
+            if (n_iters == 20) {
                 break;
             }
         }

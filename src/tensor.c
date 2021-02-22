@@ -16,6 +16,7 @@
 #include "io_utils.h"
 #include "const.h"
 
+/*
 static FILE *g_fp = NULL;
 
 int openTensorLog(const char *log_path)
@@ -38,19 +39,27 @@ int closeTensorLog()
     }
     return SUCCESS;
 }
+*/
 
 struct Tensor {
+    enum TensorType ttype;
     enum DType dtype;
+
+    // DATA_TENSOR_TYPE only
     int b; // batch_size
+    int n; // n_features
+    int b_used; // 当前实际装填的样本数 b_used <= b
+
+    // PARAM_TENSOR_TYPE only
     int row;
     int col;
-    int c; // channel
-    int n; // 实际装填的样本数， n<=b
-    float *data;
-    double *data_f64;
-    int *data_i32;
-    long long *data_i64;
-    unsigned char *data_u8;
+
+    // blob 
+    float *blob;
+    double *blob_f64;
+    int *blob_i32;
+    long long *blob_i64;
+    unsigned char *blob_u8;
 };
 
 const char *getTensorDtypeStrFromEnum(enum DType dtype)
@@ -94,88 +103,149 @@ enum DType getTensorDtypeEnumFromStr(const char *dtype_str)
     return UNKNOW_DTYPE;
 }
 
-void initTensorParameterAsWeight(struct Tensor *tensor)
+const char *getTensorTtypeStrFromEnum(enum TensorType ttype)
 {
+    switch (ttype) {
+        case DATA_TENSOR_TYPE:
+        return "data_tensor_type";
+
+        case PARAM_TENSOR_TYPE:
+        return "param_tensor_type";
+
+        default:
+        return "unknow_tensor_type";
+    }
+    return "unknow_tensor_type";
+}
+
+int initTensorParameterAsWeight(struct Tensor *tensor)
+{
+    CHK_NIL(tensor);
+    CHK_ERR((tensor->ttype == PARAM_TENSOR_TYPE)? 0: 1);
     int inputs = tensor->row;
     float scale = sqrt(2. / inputs);
     int i = 0;
-    for(i = 0; i < tensor->b * tensor->row * tensor->col * tensor->c; ++i){
-        tensor->data[i] = scale * rand_uniform(-1, 1);
+    for(i = 0; i < tensor->row * tensor->col; ++i){
+        tensor->blob[i] = scale * rand_uniform(-1, 1);
     }
+    return SUCCESS;
 }
 
-void initTensorParameterAsBias(struct Tensor *tensor)
+int initTensorParameterAsBias(struct Tensor *tensor)
 {
-    memset(tensor->data, 0, tensor->b * tensor->row * tensor->col * tensor->c * sizeof(float));
+    CHK_NIL(tensor);
+    CHK_ERR((tensor->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+
+    memset(tensor->blob, 0, tensor->row * tensor->col * sizeof(float));
+
+    return SUCCESS;
 }
 
-int createTensor(struct Tensor **t, int batch_size, int row, int col, int channel)
+int createTensorData(struct Tensor **t, enum DType dtype, int batch_size, int n_features)
 {
     CHK_NIL(t);
     CHK_ERR((batch_size > 0)? 0: 1);
-    CHK_ERR((row > 0)? 0: 1);
-    CHK_ERR((col > 0)? 0: 1);
-    CHK_ERR((channel > 0)? 0: 1);
+    CHK_ERR((n_features > 0)? 0: 1);
 
     struct Tensor *tensor = calloc(1, sizeof(struct Tensor));
     if (!tensor) {
         ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
         return ERR_COD;
     }
-    tensor->data = calloc(batch_size * row * col * channel, sizeof(float));
-    if (tensor->data == NULL) {
-        ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
-        free(tensor);
-        return ERR_COD;
+ 
+    switch (dtype) {
+        case FLOAT32:
+        tensor->blob = calloc(batch_size * n_features, sizeof(float));
+        if (tensor->blob == NULL) {
+            ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
+            goto err_end;
+        }
+        break;
+
+        case UINT8:
+        tensor->blob = calloc(batch_size * n_features, sizeof(unsigned char));
+        if (tensor->blob_u8 == NULL) {
+            ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
+            goto err_end;
+        }
+        break;
+
+        default:
+        ERR_MSG("DType: %s is not supported by DATA Tensor yet, error.\n", getTensorDtypeStrFromEnum(dtype));
+        goto err_end;
     }
+    tensor->ttype = DATA_TENSOR_TYPE;
+    tensor->dtype = dtype;
     tensor->b = batch_size;
-    tensor->dtype = FLOAT32;
-    tensor->row = row;
-    tensor->col = col;
-    tensor->c = channel;
-    tensor->n = 0; // 初始样本数为0
+    tensor->n = n_features;
+    tensor->b_used = 0; // 初始装填样本数为0
 
     *t = tensor;
     return SUCCESS;
+
+err_end:
+    if (tensor) {
+        free(tensor->blob);
+        free(tensor->blob_u8);
+        free(tensor->blob_f64);
+        free(tensor->blob_i32);
+        free(tensor->blob_i64);
+    }
+    free(tensor);
+    return ERR_COD;
 }
 
-int createTensorU8(struct Tensor **t, int batch_size, int row, int col, int channel)
+int createTensorParam(struct Tensor **t, enum DType dtype, int row, int col)
 {
     CHK_NIL(t);
-    CHK_ERR((batch_size > 0)? 0: 1);
     CHK_ERR((row > 0)? 0: 1);
     CHK_ERR((col > 0)? 0: 1);
-    CHK_ERR((channel > 0)? 0: 1);
 
     struct Tensor *tensor = calloc(1, sizeof(struct Tensor));
     if (!tensor) {
         ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
         return ERR_COD;
     }
-    tensor->data_i32 = calloc(batch_size * row * col * channel, sizeof(int));
-    if (tensor->data_i32 == NULL) {
-        ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
-        free(tensor);
-        return ERR_COD;
+ 
+    switch (dtype) {
+        case FLOAT32: // 目前参数的数据类型只支持32位浮点数float，这也是现阶段GPU计算的需要
+        tensor->blob = calloc(row * col, sizeof(float));
+        if (tensor->blob == NULL) {
+            ERR_MSG("calloc failed, detail: %s\n", ERRNO_DETAIL(errno));
+            goto err_end;
+        }
+        break;
+
+        default:
+        ERR_MSG("DType: %s is not supported by PARAM Tensor yet, error.\n", getTensorDtypeStrFromEnum(dtype));
+        goto err_end;
     }
-    tensor->b = batch_size;
-    tensor->dtype = UINT8;
+    tensor->ttype = PARAM_TENSOR_TYPE;
+    tensor->dtype = dtype;
     tensor->row = row;
     tensor->col = col;
-    tensor->c = channel;
-    tensor->n = 0; // 初始样本数为0
 
     *t = tensor;
     return SUCCESS;
+
+err_end:
+    if (tensor) {
+        free(tensor->blob);
+        free(tensor->blob_u8);
+        free(tensor->blob_f64);
+        free(tensor->blob_i32);
+        free(tensor->blob_i64);
+    }
+    free(tensor);
+    return ERR_COD;
 }
 
-int createTensorWithDataRef(struct Tensor **t, int n_samples, int row, int col, int c, const void *data, enum DType dtype)
+int createTensorDataWithBlobRef(struct Tensor **t, void *blob, enum DType dtype, int batch_size, int n_features, int n_samples)
 {
     CHK_NIL(t);
-    CHK_ERR((row > 0)? 0: 1);
-    CHK_ERR((col > 0)? 0: 1);
-    CHK_ERR((c > 0)? 0: 1);
-    CHK_NIL(data);
+    CHK_NIL(blob);
+    CHK_ERR((batch_size > 0)? 0: 1);
+    CHK_ERR((n_features > 0)? 0: 1);
     CHK_ERR((n_samples > 0)? 0: 1);
 
     struct Tensor *tensor = calloc(1, sizeof(struct Tensor));
@@ -185,11 +255,11 @@ int createTensorWithDataRef(struct Tensor **t, int n_samples, int row, int col, 
     }
     switch (dtype) {
         case FLOAT32:
-        tensor->data = (float *)data;
+        tensor->blob = (float *)blob;
         break;
 
         case UINT8:
-        tensor->data_u8 = (unsigned char *)data;
+        tensor->blob_u8 = (unsigned char *)blob;
         break;
 
         default:
@@ -197,12 +267,11 @@ int createTensorWithDataRef(struct Tensor **t, int n_samples, int row, int col, 
         free(tensor);
         return ERR_COD;
     }
+    tensor->ttype = DATA_TENSOR_TYPE;
     tensor->dtype = dtype;
-    tensor->b = n_samples;
-    tensor->row = row;
-    tensor->col = col;
-    tensor->c = c;
-    tensor->n = n_samples;
+    tensor->b = batch_size;
+    tensor->b_used = n_samples;
+    tensor->n = n_features;
 
     *t = tensor;
     return SUCCESS;
@@ -211,62 +280,56 @@ int createTensorWithDataRef(struct Tensor **t, int n_samples, int row, int col, 
 void destroyTensor(struct Tensor *tensor)
 {
     if (tensor) {
-        free(tensor->data);
-        free(tensor->data_f64);
-        free(tensor->data_i32);
-        free(tensor->data_i64);
-        free(tensor->data_u8);
+        free(tensor->blob);
+        free(tensor->blob_f64);
+        free(tensor->blob_i32);
+        free(tensor->blob_i64);
+        free(tensor->blob_u8);
     }
     free(tensor);
 }
 
-int copyTensorData(void *dst, enum DType dtype, const struct Tensor *tensor)
+int getTensorBlobByCopy(void *dst, enum DType dtype, const struct Tensor *tensor)
 {
     CHK_NIL(dst);
     CHK_NIL(tensor);
     CHK_ERR((tensor->dtype == dtype)? 0: 1);
 
-    int n_elem = tensor->n * tensor->row * tensor->col * tensor->c;
-    switch (dtype) {
-        case FLOAT32:
-        memcpy(dst, tensor->data, n_elem * sizeof(float));
-        break;
+    if (tensor->ttype == DATA_TENSOR_TYPE) {
+        int n_elem = tensor->b * tensor->n;
+        switch (dtype) {
+            case FLOAT32:
+            memcpy(dst, tensor->blob, n_elem * sizeof(float));
+            break;
 
-        case FLOAT64:
-        memcpy(dst, tensor->data_f64, n_elem * sizeof(double));
-        break;
+            case UINT8:
+            memcpy(dst, tensor->blob_u8, n_elem * sizeof(unsigned char));
+            break;
 
-        case INT32:
-        memcpy(dst, tensor->data_i32, n_elem * sizeof(int));
-        break;
+            default:
+            ERR_MSG("DType: %s is not supported yet, error.\n", getTensorDtypeStrFromEnum(dtype));
+            return ERR_COD;
+        }
+    }
+    else if (tensor->ttype == PARAM_TENSOR_TYPE) {
+        int n_elem = tensor->row * tensor->col;
+        switch (dtype) {
+            case FLOAT32:
+            memcpy(dst, tensor->blob, n_elem * sizeof(float));
+            break;
 
-        case INT64:
-        memcpy(dst, tensor->data_i64, n_elem * sizeof(long long));
-        break;
+            case UINT8:
+            memcpy(dst, tensor->blob_u8, n_elem * sizeof(unsigned char));
+            break;
 
-        case UINT8:
-        memcpy(dst, tensor->data_u8, n_elem * sizeof(unsigned char));
-        break;
-
-        default:
-        ERR_MSG("Unknow DType: %s, error.\n", getTensorDtypeStrFromEnum(dtype));
+            default:
+            ERR_MSG("DType: %s is not supported yet, error.\n", getTensorDtypeStrFromEnum(dtype));
+            return ERR_COD;
+        }
+    } else {
+        ERR_MSG("TTYPE: %s is not supported yet, error.\n", getTensorTtypeStrFromEnum(tensor->ttype));
         return ERR_COD;
     }
-    return SUCCESS;
-}
-
-int getTensorShape(int *b, int *row, int *col, int *c, const struct Tensor *tensor)
-{
-    CHK_NIL(b);
-    CHK_NIL(row);
-    CHK_NIL(col);
-    CHK_NIL(c);
-    CHK_NIL(tensor);
-
-    *b = tensor->b;
-    *row = tensor->row;
-    *col = tensor->col;
-    *c = tensor->c;
 
     return SUCCESS;
 }
@@ -276,18 +339,22 @@ int getTensorRowAndCol(int *row, int *col, const struct Tensor *tensor)
     CHK_NIL(row);
     CHK_NIL(col);
     CHK_NIL(tensor);
+    CHK_ERR((tensor->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+
     *row = tensor->row;
     *col = tensor->col;
     return SUCCESS;
 }
 
-int getTensorBatchAndChannel(int *b, int *c, const struct Tensor *tensor)
+int getTensorBatchAndFeatures(int *batch_size, int *n_features, const struct Tensor *tensor)
 {
-    CHK_NIL(b);
-    CHK_NIL(c);
+    CHK_NIL(batch_size);
+    CHK_NIL(n_features);
     CHK_NIL(tensor);
-    *b = tensor->b;
-    *c = tensor->c;
+    CHK_ERR((tensor->ttype == DATA_TENSOR_TYPE)? 0: 1);
+
+    *batch_size = tensor->b;
+    *n_features = tensor->n;
     return SUCCESS;
 }
 
@@ -295,6 +362,7 @@ int getTensorRow(int *row, const struct Tensor *tensor)
 {
     CHK_NIL(row);
     CHK_NIL(tensor);
+    CHK_ERR((tensor->ttype == PARAM_TENSOR_TYPE)? 0: 1);
     *row = tensor->row;
     return SUCCESS;
 }
@@ -303,15 +371,8 @@ int getTensorCol(int *col, const struct Tensor *tensor)
 {
     CHK_NIL(col);
     CHK_NIL(tensor);
+    CHK_ERR((tensor->ttype == PARAM_TENSOR_TYPE)? 0: 1);
     *col = tensor->col;
-    return SUCCESS;
-}
-
-int getTensorChannel(int *c, const struct Tensor *tensor)
-{
-    CHK_NIL(c);
-    CHK_NIL(tensor);
-    *c = tensor->c;
     return SUCCESS;
 }
 
@@ -319,15 +380,26 @@ int getTensorBatch(int *b, const struct Tensor *tensor)
 {
     CHK_NIL(b);
     CHK_NIL(tensor);
+    CHK_ERR((tensor->ttype == DATA_TENSOR_TYPE)? 0: 1);
     *b = tensor->b;
     return SUCCESS;
 }
 
-int getTensorSamples(int *n, const struct Tensor *tensor)
+int getTensorFeatures(int *n_features, const struct Tensor *tensor)
 {
-    CHK_NIL(n);
+    CHK_NIL(n_features);
     CHK_NIL(tensor);
-    *n = tensor->n;
+    CHK_ERR((tensor->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    *n_features = tensor->n;
+    return SUCCESS;
+}
+
+int getTensorSamples(int *n_samples, const struct Tensor *tensor)
+{
+    CHK_NIL(n_samples);
+    CHK_NIL(tensor);
+    CHK_ERR((tensor->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    *n_samples = tensor->b_used;
     return SUCCESS;
 }
 
@@ -339,100 +411,66 @@ int getTensorDType(enum DType *dtype, const struct Tensor *tensor)
     return SUCCESS;
 }
 
-int getTensorData(void **data, struct Tensor *tensor)
+int getTensorType(enum TensorType *ttype, const struct Tensor *tensor)
 {
-    CHK_NIL(data);
+    CHK_NIL(ttype);
+    CHK_NIL(tensor);
+    *ttype = tensor->ttype;
+    return SUCCESS;
+}
+
+int getTensorBlob(void **blob, struct Tensor *tensor)
+{
+    CHK_NIL(blob);
     CHK_NIL(tensor);
 
     switch (tensor->dtype) {
         case FLOAT32:
-        *data = tensor->data;
-        break;
-
-        case FLOAT64:
-        *data = tensor->data_f64;
-        break;
-
-        case INT32:
-        *data = tensor->data_i32;
-        break;
-
-        case INT64:
-        *data = tensor->data_i64;
+        *blob = tensor->blob;
         break;
 
         case UINT8:
-        *data = tensor->data_u8;
+        *blob = tensor->blob_u8;
         break;
 
         default:
-        ERR_MSG("Unknow DType: %s, error.\n", getTensorDtypeStrFromEnum(tensor->dtype));
+        ERR_MSG("DType: %s is not supported yet, error.\n", getTensorDtypeStrFromEnum(tensor->dtype));
         return ERR_COD;
     }
     return SUCCESS;
 }
 
-int setTensorData(struct Tensor *tensor, const void *data, enum DType dtype, int n)
+int setTensorSamplesByReplace(void **blob_old, struct Tensor *tensor, void *blob, int n_samples, int n_features, enum DType dtype)
 {
-    CHK_NIL(tensor); 
-    CHK_NIL(data);
-
-    int n_features = tensor->col * tensor->row * tensor->c;
-    switch (tensor->dtype) {
-        case FLOAT32:
-        switch (dtype) {
-            case UINT8:
-            {
-                const unsigned char *src = data;
-                int i, j;
-                for (i = 0; i < n; ++i) {
-                    for (j = 0; j < n_features; ++j) {
-                        tensor->data[i * n_features + j] = (float)(src[i * n_features + j]);
-                    }
-                }
-            }
-            break;
-
-            default:
-            ERR_MSG("src_dtype: %s to dst_dtype: %s not supported, error.\n", getTensorDtypeStrFromEnum(dtype), getTensorDtypeStrFromEnum(tensor->dtype));
-            return ERR_COD;
-        }
-        break;
-
-        default:
-        return ERR_COD;
-    }
-    tensor->n = n;
-    return SUCCESS;
-}
-
-int setTensorBatchAndDataByReplace(struct Tensor *tensor, const void *data, int n_samples, enum DType dtype, int need_free)
-{
+    CHK_NIL(blob_old);
     CHK_NIL(tensor);
+    CHK_NIL(blob);
     CHK_ERR((n_samples > 0)? 0: 1);
-    CHK_NIL(data);
+    CHK_ERR((n_features > 0)? 0: 1);
     CHK_ERR((tensor->dtype == dtype)? 0: 1);
+    CHK_ERR((tensor->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((n_samples <= tensor->b)? 0: 1);
+    CHK_ERR((n_features == tensor->n)? 0: 1);
+
+    void *tmp = NULL;
     switch (dtype) {
         case UINT8:
-        if (need_free) {
-            free(tensor->data_u8);
-        }
-        tensor->data_u8 = (unsigned char *)data;
+        tmp = tensor->blob_u8;
+        tensor->blob_u8 = (unsigned char *)blob;
         break;
 
         case FLOAT32:
-        if (need_free) {
-            free(tensor->data);
-        }
-        tensor->data = (float *)data;
+        tmp = tensor->blob;
+        tensor->blob = (float *)blob;
         break;
 
         default:
         ERR_MSG("DType: %s is not supported yet, error.\n", getTensorDtypeStrFromEnum(dtype));
         return ERR_COD;
     }
+    *blob_old = tmp;
+    tensor->b_used = n_samples;
     tensor->b = n_samples;
-    tensor->n = n_samples;
     return SUCCESS;
 }
 
@@ -441,21 +479,36 @@ int activateTensor(struct Tensor *y, const struct Tensor *x, enum ActivationType
 {
     CHK_NIL(x);
     CHK_ERR((x->n > 0)? 0: 1);
+    CHK_ERR((x->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((x->ttype == y->ttype)? 0: 1);
 
-    int i = 0;
-    switch (act_type) {
-        case LOGISTIC:
-        for (i = 0; i < x->n * x->row * x->col * x->c; ++i) {
-            //y->data[i] = 1./(1. + exp(-1 * (x->data[i])));
-            y->data[i] = logistic_activate(x->data[i]);
+    if (x->ttype == DATA_TENSOR_TYPE) {
+        int i = 0;
+        switch (act_type) {
+            case LOGISTIC:
+            //fprintf(stdout, "x->b_used = %d,  x->n = %d\n", x->b_used, x->n);
+            for (i = 0; i < x->b_used * x->n; ++i) {
+                y->blob[i] = logistic_activate(x->blob[i]); // activations.h, inline
+            }
+            break;
+
+            case RELU:
+            //fprintf(stdout, "x->b_used = %d,  x->n = %d\n", x->b_used, x->n);
+            for (i = 0; i < x->b_used * x->n; ++i) {
+                y->blob[i] = relu_activate(x->blob[i]); // activations.h, inline
+            }
+            break;
+
+            default:
+            ERR_MSG("Unknow activation_type, error.\n");
+            return ERR_COD;
         }
-        break;
-
-        default:
-        ERR_MSG("Unknow activation_type, error.\n");
+        y->b_used = x->b_used;
+    }
+    else {
+        ERR_MSG("TensorType: %s not supported yet, error.\n", getTensorTtypeStrFromEnum(x->ttype));
         return ERR_COD;
     }
-    y->n = x->n;
     return SUCCESS;
 }
 
@@ -465,14 +518,26 @@ int deactivateTensor(struct Tensor *delta_out, const struct Tensor *delta_in, co
     CHK_NIL(delta_out);
     CHK_NIL(delta_in);
     CHK_NIL(input);
+    CHK_ERR((delta_out->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((delta_in->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((input->ttype == DATA_TENSOR_TYPE)? 0: 1);
     CHK_ERR((delta_in->n > 0)? 0: 1);
     CHK_ERR((delta_in->n == input->n)? 0: 1);
+    CHK_ERR((delta_in->n == delta_out->n)? 0: 1);
+    CHK_ERR((delta_in->b_used > 0)? 0: 1);
+    CHK_ERR((delta_in->b_used == input->b_used)? 0: 1);
 
     int i = 0;
     switch (act_type) {
         case LOGISTIC:
-        for (i = 0; i < input->n * input->row * input->col * input->c; ++i) {
-            delta_out->data[i] = logistic_gradient(input->data[i]) * delta_in->data[i]; // 注意这里的x应该是outputs[i]，而不是hiddens[i]
+        for (i = 0; i < input->b_used * input->n; ++i) {
+            delta_out->blob[i] = logistic_gradient(input->blob[i]) * delta_in->blob[i]; // 注意这里的x应该是outputs[i]，而不是hiddens[i]
+        }
+        break;
+
+        case RELU:
+        for (i = 0; i < input->b_used * input->n; ++i) {
+            delta_out->blob[i] = relu_gradient(input->blob[i]) * delta_in->blob[i]; // 注意这里的x应该是outputs[i]，而不是hiddens[i]
         }
         break;
 
@@ -480,7 +545,7 @@ int deactivateTensor(struct Tensor *delta_out, const struct Tensor *delta_in, co
         ERR_MSG("Unknow dectivation_type, error.\n");
         return ERR_COD;
     }
-    delta_out->n = delta_in->n;
+    delta_out->b_used = delta_in->b_used;
     return SUCCESS;
 }
 
@@ -490,25 +555,28 @@ int deactivateTensor(struct Tensor *delta_out, const struct Tensor *delta_in, co
  * @param z: 输出参数, shape = (n_input, n_output)
  * @param b: 输入参数, shape = (1, n_output)
  */
-int linearTensor(struct Tensor *z, const struct Tensor *x, int xt, const struct Tensor *y, int yt, const struct Tensor *b)
+int linearTensorForward(struct Tensor *z, const struct Tensor *x, const struct Tensor *y, const struct Tensor *b)
 {
     CHK_NIL(z);
     CHK_NIL(x);
     CHK_NIL(y);
-    CHK_ERR((x->n > 0)? 0: 1);
+    CHK_ERR((x->b_used > 0)? 0: 1);
+    CHK_ERR((x->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((z->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((y->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((b->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((x->n == y->col)? 0: 1);
+    CHK_ERR((z->n == y->row)? 0: 1);
 #ifdef _DEBUG
     fprintf(stdout, "(z.b, z.row, z.col, z.c, z.n) = (%d, %d, %d, %d, %d)\n", z->b, z->row, z->col, z->c, z->n);
     fprintf(stdout, "(y.b, y.row, y.col, y.c, y.n) = (%d, %d, %d, %d, %d)\n", y->b, y->row, y->col, y->c, y->n);
     fprintf(stdout, "(x.b, x.row, x.col, x.c, x.n) = (%d, %d, %d, %d, %d)\n", x->b, x->row, x->col, x->c, x->n);
 #endif
-    //CHK_ERR((z->col == y->row)? 0: 1);
-    //CHK_ERR((x->col == y->col)? 0: 1);
-    //CHK_ERR((b->col == y->row)? 0: 1);
 
     if (b) {
         int i = 0;
-        for (i = 0; i < x->n; ++i) {
-            memcpy(z->data + i * z->col, b->data, sizeof(float) * b->col);
+        for (i = 0; i < x->b_used; ++i) {
+            memcpy(z->blob + i * z->n, b->blob, sizeof(float) * b->col);
         }
     }
 
@@ -517,108 +585,102 @@ int linearTensor(struct Tensor *z, const struct Tensor *x, int xt, const struct 
     //     float *B, int ldb,
     //     float BETA,
     //     float *C, int ldc)
-    gemm(xt, yt, x->n, y->row, x->col, 1., 
-        x->data, x->col, 
-        y->data, y->row, 
+    gemm(0, 1, x->b_used, y->row, y->col, 1., 
+        x->blob, x->n, 
+        y->blob, y->col, 
         1., 
-        z->data, y->row);
-    z->n = x->n;
+        z->blob, z->n);
+    z->b_used = x->b_used;
     return SUCCESS;
 }
 
-int linearTensor1(struct Tensor *z, const struct Tensor *x, int xt, const struct Tensor *y, int yt, const struct Tensor *b)
+int linearTensorBackward(struct Tensor *z, const struct Tensor *x, const struct Tensor *y)
 {
     CHK_NIL(z);
     CHK_NIL(x);
     CHK_NIL(y);
-    CHK_ERR((x->n > 0)? 0: 1);
+    CHK_ERR((x->b_used > 0)? 0: 1);
+    CHK_ERR((x->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((z->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((y->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((z->n == y->col)? 0: 1);
+    CHK_ERR((x->n == y->row)? 0: 1);
 #ifdef _DEBUG
     fprintf(stdout, "(z.b, z.row, z.col, z.c, z.n) = (%d, %d, %d, %d, %d)\n", z->b, z->row, z->col, z->c, z->n);
     fprintf(stdout, "(y.b, y.row, y.col, y.c, y.n) = (%d, %d, %d, %d, %d)\n", y->b, y->row, y->col, y->c, y->n);
     fprintf(stdout, "(x.b, x.row, x.col, x.c, x.n) = (%d, %d, %d, %d, %d)\n", x->b, x->row, x->col, x->c, x->n);
 #endif
-    //CHK_ERR((z->col == y->row)? 0: 1);
-    //CHK_ERR((x->col == y->col)? 0: 1);
-    //CHK_ERR((b->col == y->row)? 0: 1);
-
-    if (b) {
-        int i = 0;
-        for (i = 0; i < x->n; ++i) {
-            memcpy(z->data + i * z->col, b->data, sizeof(float) * b->col);
-        }
-    }
 
     // gemm(int TA, int TB, int M, int N, int K, float ALPHA, 
     //     float *A, int lda, 
     //     float *B, int ldb,
     //     float BETA,
     //     float *C, int ldc)
-    gemm(xt, yt, x->n, y->col, y->row, 1., 
-        x->data, x->col, 
-        y->data, y->col, 
+    gemm(0, 0, x->b_used, y->col, y->row, 1., 
+        x->blob, x->n, 
+        y->blob, y->col, 
         1., 
-        z->data, z->col);
-    z->n = x->n;
+        z->blob, z->n);
+    z->b_used = x->b_used;
     return SUCCESS;
 }
 
-int linearTensor2(struct Tensor *z, const struct Tensor *x, int xt, const struct Tensor *y, int yt, const struct Tensor *b)
+int linearTensorWeightGradient(struct Tensor *z, const struct Tensor *x, const struct Tensor *y)
 {
     CHK_NIL(z);
     CHK_NIL(x);
     CHK_NIL(y);
-    CHK_ERR((x->n > 0)? 0: 1);
+    CHK_ERR((x->b_used > 0)? 0: 1);
+    CHK_ERR((x->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((y->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((z->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((z->col == y->n)? 0: 1);
+    CHK_ERR((z->row == x->n)? 0: 1);
+    CHK_ERR((x->b_used == y->b_used)? 0: 1);
 #ifdef _DEBUG
-    fprintf(stdout, "(z.b, z.row, z.col, z.c, z.n) = (%d, %d, %d, %d, %d)\n", z->b, z->row, z->col, z->c, z->n);
-    fprintf(stdout, "(y.b, y.row, y.col, y.c, y.n) = (%d, %d, %d, %d, %d)\n", y->b, y->row, y->col, y->c, y->n);
-    fprintf(stdout, "(x.b, x.row, x.col, x.c, x.n) = (%d, %d, %d, %d, %d)\n", x->b, x->row, x->col, x->c, x->n);
+    fprintf(stdout, "(z.r, z.c) = (%d, %d)\n", z->row, z->col);
+    fprintf(stdout, "(y.b, y.n) = (%d, %d)\n", y->b_used, y->n);
+    fprintf(stdout, "(x.b, x.n) = (%d, %d)\n", x->b_used, x->n);
+    fprintf(stdout, "x->blob[128] = %f\n", x->blob[128]);
 #endif
-    //CHK_ERR((z->col == y->row)? 0: 1);
-    //CHK_ERR((x->col == y->col)? 0: 1);
-    //CHK_ERR((b->col == y->row)? 0: 1);
-
-    if (b) {
-        int i = 0;
-        for (i = 0; i < x->n; ++i) {
-            memcpy(z->data + i * z->col, b->data, sizeof(float) * b->col);
-        }
-    }
-
     // gemm(int TA, int TB, int M, int N, int K, float ALPHA, 
     //     float *A, int lda, 
     //     float *B, int ldb,
     //     float BETA,
     //     float *C, int ldc)
-    gemm(xt, yt, x->col, y->col, x->n, 1., 
-        x->data, x->row, 
-        y->data, y->col, 
+    //fprintf(stdout, "start linearTensorWeightGradient++++++++++\n");
+    gemm(1, 0, x->n, y->n, x->b_used, 1., 
+        x->blob, x->n, 
+        y->blob, y->n, 
         1., 
-        z->data, z->col);
-    //z->n = x->n;
+        z->blob, z->col);
+    //fprintf(stdout, "finish linearTensorWeightGradient----------\n");
     return SUCCESS;
 }
 
 
 // 2个形状完全相同的矩阵x和y的元素做Pointwise乘法, 之后每行求和, 压缩成一个向量, 结果保存在z中
 // 该函数用来在反向传播时计算偏置bias的梯度
-//int mulTensorPointwiseAndSum(struct Tensor *z, const struct Tensor *x, const struct Tensor *y)
-int sumTensorAxisCol(struct Tensor *z, const struct Tensor *x)
+//int sumTensorAxisCol(struct Tensor *z, const struct Tensor *x)
+int linearTensorBiasGradient(struct Tensor *z, const struct Tensor *x)
 {
     CHK_NIL(z);
     CHK_NIL(x);
+    CHK_ERR((x->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((z->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((z->col == x->n)? 0: 1);
 #ifdef _DEBUG
     fprintf(stdout, "(x.b, x.row, x.col, x.c, x.n) = (%d, %d, %d, %d, %d)\n", x->b, x->row, x->col, x->c, x->n);
     fprintf(stdout, "(z.b, z.row, z.col, z.c. z.n) = (%d, %d, %d, %d, %d)\n", z->b, z->row, z->col, z->c, z->n);
 #endif
-    CHK_ERR((x->col == z->col)? 0: 1);
 
-    int n = x->n; // batch_size
-    int c = x->col; // n_output
+    int b_used = x->b_used; // batch_size
+    int n = x->n; // n_output
     int i, j;
-    for (i = 0; i < c; ++i) {
-        z->data[i] = 0.;
-        for (j = 0; j < n; ++j) {
-            z->data[i] += x->data[j * c + i];
+    for (i = 0; i < n; ++i) {
+        z->blob[i] = 0.;
+        for (j = 0; j < b_used; ++j) {
+            z->blob[i] += x->blob[j * n + i];
         }
     }
     return SUCCESS;
@@ -631,27 +693,30 @@ int addTensor(struct Tensor *x, struct Tensor *y, float lr, float momentum)
 {
     CHK_NIL(x);
     CHK_NIL(y);
+    CHK_ERR((x->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((y->ttype == PARAM_TENSOR_TYPE)? 0: 1);
 
     // STEP 0: prepare
     //lr *= -1;
-    int n = y->row * y->col * y->c;
+    int n = y->row * y->col;
 #ifdef _DEBUG
     fprintf(stdout, "(y.b, y.row, y.col, y.c, y.n) = (%d, %d, %d, %d, %d)\n", y->b, y->row, y->col, y->c, y->n);
 #endif
+    //fprintf(stdout, "(y.row, y.col) = (%d, %d)\n", y->row, y->col);
     // STEP 1: y = lr * y
     int i = 0;
     for (i = 0; i < n; ++i) {
-        (y->data[i]) *= lr;
+        (y->blob[i]) *= lr;
     }
 
     // STEP 2: x = x + lr
     for (i = 0; i < n; ++i) {
-        x->data[i] += y->data[i];
+        x->blob[i] += y->blob[i];
     }
 
     // STEP 3: y = momentum * y
     for (i = 0; i < n; ++i) {
-        y->data[i] *= momentum;
+        y->blob[i] *= momentum;
     }
 
     return SUCCESS;
@@ -661,30 +726,33 @@ int softmaxTensor(struct Tensor *output, const struct Tensor *input)
 {
     CHK_NIL(output);
     CHK_NIL(input);
+    CHK_ERR((input->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((output->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((output->n == input->n)? 0: 1);
 
-    int n = input->n;
-    int k = output->col;
+    int b_used = input->b_used;
+    int k = output->n;
 
     int i;
-    for (i = 0; i < n; ++i) {
+    for (i = 0; i < b_used; ++i) {
         float largest = -FLT_MAX;
         int j;
         for(j = 0; j < k; ++j){
-            if(input->data[i * k + j] > largest) {
-                largest = input->data[i * k + j];
+            if(input->blob[i * k + j] > largest) {
+                largest = input->blob[i * k + j];
             }
         }
         float sum = 0;
         for(j = 0; j < k; ++j){
-            float e = exp(input->data[i * k + j] - largest);
+            float e = exp(input->blob[i * k + j] - largest);
             sum += e;
-            output->data[i * k + j] = e;
+            output->blob[i * k + j] = e;
         }
         for(j = 0; j < k; ++j){
-            (output->data[i * k + j]) /= sum;
+            (output->blob[i * k + j]) /= sum;
         }
     }
-    output->n = input->n;
+    output->b_used = input->b_used;
     return SUCCESS;
 }
 
@@ -693,8 +761,11 @@ int addTensor2(struct Tensor *delta, const struct Tensor *y, const struct Tensor
     CHK_NIL(delta);
     CHK_NIL(y);
     CHK_NIL(gt);
+    CHK_ERR((delta->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((y->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((gt->ttype == DATA_TENSOR_TYPE)? 0: 1);
 
-    int n = y->n * y->col;
+    int n_elems = y->b_used * y->n;
 #ifdef _DEBUG
     fprintf(stdout, "(y->b, y->row, y->col, y->c, y->n) = (%d, %d, %d, %d, %d)\n", y->b, y->row, y->col, y->c, y->n);
     fprintf(stdout, "(gt->b, gt->row, gt->col, gt->c, gt->n) = (%d, %d, %d, %d, %d)\n", gt->b, gt->row, gt->col, gt->c, gt->n);
@@ -703,8 +774,8 @@ int addTensor2(struct Tensor *delta, const struct Tensor *y, const struct Tensor
     int i;
     switch (gt->dtype) {
         case UINT8:
-        for (i = 0; i < n; ++i) {
-            delta->data[i] = gt->data_u8[i] - y->data[i];
+        for (i = 0; i < n_elems; ++i) {
+            delta->blob[i] = gt->blob_u8[i] - y->blob[i];
         }
         break;
 
@@ -712,7 +783,7 @@ int addTensor2(struct Tensor *delta, const struct Tensor *y, const struct Tensor
         ERR_MSG("DType not supported yet, error.\n");
         return ERR_COD;
     }
-    delta->n = y->n;
+    delta->b_used = y->b_used;
 
     return SUCCESS;
 }
@@ -724,32 +795,35 @@ int probTensor(float *val, const struct Tensor *p, const struct Tensor *gt)
     CHK_NIL(p);
     CHK_NIL(gt);
     CHK_ERR((gt->dtype == UINT8)? 0: 1); // one-hot表示，每个元素非0即1，因此uint8足够
+    CHK_ERR((p->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((gt->ttype == DATA_TENSOR_TYPE)? 0: 1);
+    CHK_ERR((p->b_used == gt->b_used)? 0: 1);
 
-    int n = p->n;
-    int c = p->col;
+    int b_used = p->b_used;
+    int k = p->n;
     float sum_log_p = 0.;
     int i, j;
-    for (i = 0; i < n; ++i) {
-        for (j = 0; j < c; ++j) {
-            if (gt->data_u8[i * c + j] != 0) {
-                //sum_log_p += p->data[i * c + j];
-                sum_log_p += log(p->data[i * c + j]);
+    for (i = 0; i < b_used; ++i) {
+        for (j = 0; j < k; ++j) {
+            if (gt->blob_u8[i * k + j] != 0) {
+                sum_log_p += log(p->blob[i * k + j]);
                 break;
             }
         }
     }
-    fprintf(stdout, "sum_log_p = %f, n = %d\n", sum_log_p, n);
-    *val = sum_log_p / n; // 计算平均值, 用于观察评估寻俩效果的代价值建议与样本数无关
+    fprintf(stdout, "sum_log_p = %f, n = %d\n", sum_log_p, b_used);
+    *val = sum_log_p / b_used; // 计算平均值, 用于观察评估寻俩效果的代价值建议与样本数无关
     return SUCCESS;
 }
 
-static void log2d(const float *data, int m, int n, FILE *fp) {
+/*
+static void log2d(const float *blob, int m, int n, FILE *fp) {
     char buf[64];
     int len;
     int i, j;
     for (i = 0; i < m; ++i) {
         for (j = 0; j < n; ++j) {
-            len = snprintf(buf, 64, "%f ", data[i * n + j]);
+            len = snprintf(buf, 64, "%f ", blob[i * n + j]);
             fwrite(buf, sizeof(char), len, fp);
         }
         fwrite("\n", sizeof(char), 1, fp);
@@ -760,12 +834,12 @@ static void log2d(const float *data, int m, int n, FILE *fp) {
  
 static void log2dParam(const struct Tensor *t, FILE *fp)
 {
-    log2d(t->data, t->row, t->col, fp);
+    log2d(t->blob, t->row, t->col, fp);
 }
 
 static void log2dData(const struct Tensor *t, FILE * fp)
 {
-    log2d(t->data, t->n, t->col, fp);
+    log2d(t->blob, t->n, t->col, fp);
 }
 
 void logTensorParam(const struct Tensor *t)
@@ -789,6 +863,7 @@ void logTensorStr(const char *str)
     }
     fsync(fd);
 }
+*/
 
 int savetxtTensorData(const struct Tensor *t, const char *dst_dir, const char *prefix, const char *name, int n_epoch, int n_iter)
 {
@@ -796,16 +871,17 @@ int savetxtTensorData(const struct Tensor *t, const char *dst_dir, const char *p
     CHK_NIL(dst_dir);
     CHK_NIL(prefix);
     CHK_NIL(name);
+    CHK_ERR((t->ttype == DATA_TENSOR_TYPE)? 0: 1);
 
     char pth[NN_PATH_LEN];
-    snprintf(pth, NN_PATH_LEN, "%s/%s_epoch_%03d_iter_%03d_%s_%dx%d.txt", dst_dir, name, n_epoch, n_iter, prefix, t->row, t->col);
+    snprintf(pth, NN_PATH_LEN, "%s/epoch_%03d_iter_%03d_%s_%s_%dx%d.txt", dst_dir, n_epoch, n_iter, name, prefix, t->b_used, t->n);
     switch (t->dtype) {
         case FLOAT32:
-        CHK_ERR(savetxtMatrixFlot32(pth, t->data, t->b, t->col));
+        CHK_ERR(savetxtMatrixFlot32(pth, t->blob, t->b_used, t->n));
         break;
 
         case UINT8:
-        CHK_ERR(savetxtMatrixUint8(pth, t->data_u8, t->b, t->col));
+        CHK_ERR(savetxtMatrixUint8(pth, t->blob_u8, t->b_used, t->n));
         break;
 
         default:
@@ -822,17 +898,18 @@ int savetxtTensorParam(const struct Tensor *t, const char *dst_dir, const char *
     CHK_NIL(dst_dir);
     CHK_NIL(prefix);
     CHK_NIL(name);
+    CHK_ERR((t->ttype == PARAM_TENSOR_TYPE)? 0: 1);
 
     char pth[NN_PATH_LEN];
-    snprintf(pth, NN_PATH_LEN, "%s/%s_epoch_%03d_iter_%03d_%s_%dx%d.txt", dst_dir, name, n_epoch, n_iter, prefix, t->row, t->col);
+    snprintf(pth, NN_PATH_LEN, "%s/epoch_%03d_iter_%03d_%s_%s_%dx%d.txt", dst_dir, n_epoch, n_iter, name, prefix, t->row, t->col);
     
     switch (t->dtype) {
         case FLOAT32:
-        CHK_ERR(savetxtMatrixFlot32(pth, t->data, t->row, t->col));
+        CHK_ERR(savetxtMatrixFlot32(pth, t->blob, t->row, t->col));
         break;
 
         case UINT8:
-        CHK_ERR(savetxtMatrixUint8(pth, t->data_u8, t->row, t->col));
+        CHK_ERR(savetxtMatrixUint8(pth, t->blob_u8, t->row, t->col));
         break;
 
         default:

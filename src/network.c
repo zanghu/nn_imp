@@ -29,8 +29,30 @@ int createNetwork(struct Network **network, struct Layer **layers, int n_layers,
     CHK_ERR((n_layers > 0)? 0: 1);
     CHK_NIL(cost);
 
-    // 检查相邻层神经元个数是否匹配
+    // 检查每一层的名字是否唯一
     int i = 0;
+    for (i = 0; i < n_layers; ++i) {
+        const char *name_i = NULL;
+        CHK_ERR(getLayerName(&name_i, layers[i]));
+        int j = 0;
+        for (j = i + 1; j < n_layers; ++j) {
+            const char *name_j = NULL;
+            CHK_ERR(getLayerName(&name_j, layers[j]));
+            if (strcmp(name_i, name_j) == 0) {
+                ERR_MSG("Layers[%d] name: %s is the same as Layer[%d] name: %s, error.\n", i, name_i, j, name_j);
+                return ERR_COD;
+            }
+        }
+    }
+
+    // 根据前一层神经元个数设置激活层神经元个数
+    for (i = 1; i < n_layers; ++i) {
+        int n_out = 0;
+        CHK_ERR(getLayerOutputNumber(&n_out, layers[i-1]));
+        CHK_ERR(setLayerNeuronNumber(layers[i], n_out));
+    }
+
+    // 检查相邻层神经元个数是否匹配
     for (i = 0; i < n_layers - 1; ++i) {
         int n_bottom = 0;
         int n_top = 0;
@@ -75,15 +97,16 @@ static int allocNetworkCache(struct Network *net, const struct UpdateArgs *args)
     CHK_NIL(args);
 
     int n_layers = net->n_layers;
+    int i;
+
     CHK_NIL_GOTO((net->deltas = calloc(n_layers, sizeof(struct Tensor *))));
     CHK_NIL_GOTO((net->outputs = calloc(n_layers, sizeof(struct Tensor *))));
 
-    int i;
     for (i = 0; i < n_layers; ++i) {
         int n_out = 0;
         CHK_ERR_GOTO(getLayerOutputNumber(&n_out, net->layers[i]));
-        CHK_ERR_GOTO(createTensor(&(net->deltas[i]), args->batch_size, 1, n_out, 1));
-        CHK_ERR_GOTO(createTensor(&(net->outputs[i]), args->batch_size, 1, n_out, 1));
+        CHK_ERR_GOTO(createTensorData(&(net->deltas[i]), FLOAT32, args->batch_size, n_out));
+        CHK_ERR_GOTO(createTensorData(&(net->outputs[i]), FLOAT32, args->batch_size, n_out));
     }
 
     // 连接各层, 实质上就是将各层与其正向传播和反向传播时的输入输出Tensor关联
@@ -213,13 +236,17 @@ static int checkNetworkInput(struct Network *net, const struct Tensor *input)
 }
 */
  
-int forwardNetwork(struct Network *net, const void *input_data, int n_samples, const char *dtype_str, const struct UpdateArgs *args, struct Probe *probe)
+int forwardNetwork(struct Network *net, const void *input_data, int n_samples, int n_features, const char *dtype_str, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(net);
     CHK_NIL(input_data);
+    CHK_ERR((n_samples > 0)? 0: 1);
+    CHK_ERR((n_features > 0)? 0: 1);
     CHK_NIL(dtype_str);
     CHK_ERR(checkUpdateArgs(args));
     CHK_NIL(net->layers);
+    CHK_NIL(args);
+    CHK_ERR((n_samples <= args->batch_size)? 0: 1);
 
     // 每次运行时，检查是否需要分配输入输出缓冲区空间，可能的原因包括：
     // (1)网络首次运行;
@@ -229,12 +256,13 @@ int forwardNetwork(struct Network *net, const void *input_data, int n_samples, c
     // 输入数据绑定Tensor对象
     enum DType dtype = getTensorDtypeEnumFromStr(dtype_str);
     if (net->input) {
-        CHK_ERR(setTensorBatchAndDataByReplace(net->input, input_data, n_samples, dtype, 0)); // need_free=0, 因为输入数据由用户分配且用户拥有句柄，因此由用户负责释放
+        void *blob_old = NULL; // 约定了输入的数据由用户负责保管句柄，因此不需要把旧训练数据的句柄返还给用户
+        CHK_ERR(setTensorSamplesByReplace(&blob_old, net->input, (void *)input_data, n_samples, n_features, dtype));
     }
     else {
         int n_in;
         CHK_ERR(getLayerInputNumber(&n_in, net->layers[0]));
-        CHK_ERR(createTensorWithDataRef(&(net->input), n_samples, 1, n_in, 1, input_data, dtype));
+        CHK_ERR(createTensorDataWithBlobRef(&(net->input), (void *)input_data, dtype, args->batch_size, n_features, n_samples));
     }
 
     CHK_ERR(setLayerInput(net->layers[0], net->input));
@@ -248,23 +276,30 @@ int forwardNetwork(struct Network *net, const void *input_data, int n_samples, c
     return 0;
 }
 
-int backwardNetwork(struct Network *net, const void *gt_data, int n_samples, const char *dtype_str, const struct UpdateArgs *args, struct Probe *probe)
+int backwardNetwork(struct Network *net, const void *gt_data, int n_samples, int n_features, const char *dtype_str, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(net);
     CHK_NIL(gt_data);
+    CHK_ERR((n_samples > 0)? 0: 1);
+    CHK_ERR((n_features > 0)? 0: 1);
     CHK_ERR(checkUpdateArgs(args));
+    CHK_NIL(net->layers);
+    CHK_NIL(args);
+    CHK_ERR((n_samples <= args->batch_size)? 0: 1);
 
     // gt绑定Tensor对象
     enum DType dtype = getTensorDtypeEnumFromStr(dtype_str);
     if (net->gt) {
-        CHK_ERR(setTensorBatchAndDataByReplace(net->gt, gt_data, n_samples, dtype, 0)); // need_free=0, 因为输入数据由用户分配且用户拥有句柄，因此由用户负责释放
+        void *blob_old = NULL; // 约定了输入的数据由用户负责保管句柄，因此不需要把旧训练数据的句柄返还给用户
+        CHK_ERR(setTensorSamplesByReplace(&blob_old, net->gt, (void *)gt_data, n_samples, n_features, dtype));
     }
     else {
         int n_features;
         enum DType dtype_needed;
         CHK_ERR(getCostGroundTruthAttributes(&n_features, &dtype_needed,net->cost));
         CHK_ERR((dtype == dtype_needed)? 0: 1);
-        CHK_ERR(createTensorWithDataRef(&(net->gt), n_samples, 1, n_features, 1, gt_data, dtype));
+        //CHK_ERR(createTensorWithDataRef(&(net->gt), n_samples, 1, n_features, 1, gt_data, dtype));
+        CHK_ERR(createTensorDataWithBlobRef(&(net->gt), (void *)gt_data, dtype, args->batch_size, n_features, n_samples));
     }
 
     CHK_ERR(backwardCost(net->cost, net->gt, args, probe));

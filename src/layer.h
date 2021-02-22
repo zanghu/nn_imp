@@ -10,6 +10,7 @@ enum LayerType
     UNKNOW_LAYER_TYPE,
     LINEAR_LAYER_TYPE,
     SIGMOID_LAYER_TYPE,
+    RELU_LAYER_TYPE,
     SOFTMAX_LAYER_TYPE
 };
 
@@ -33,7 +34,9 @@ int updateLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe
 int getLayerInputNumber(int *n_in, const struct Layer *layer);
 int getLayerOutputNumber(int *n_out, const struct Layer *layer);
 int getLayerShape(int *n_in, int *n_out, const struct Layer *layer);
+int getLayerName(const char *(*name), const struct Layer *layer);
 
+int setLayerNeuronNumber(struct Layer *layer, int n_neurons);
 int setLayerName(struct Layer *layer, const char *name);
 int setLayerIndex(struct Layer *layer, int idx);
 int setLayerInput(struct Layer *layer, const struct Tensor *input);

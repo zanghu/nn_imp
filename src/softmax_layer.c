@@ -17,10 +17,9 @@ struct SoftmaxLayer
     int n_neurons;
 };
 
-int createSoftmaxLayer(struct SoftmaxLayer **l, const char *name, int n_neurons)
+int createSoftmaxLayer(struct SoftmaxLayer **l, const char *name)
 {
     CHK_NIL(l);
-    CHK_ERR((n_neurons > 0)? 0: 1);
 
     struct SoftmaxLayer *layer = calloc(1, sizeof(struct SoftmaxLayer));
     if (layer == NULL) {
@@ -28,7 +27,6 @@ int createSoftmaxLayer(struct SoftmaxLayer **l, const char *name, int n_neurons)
         return ERR_COD;
     }
     ((struct Layer *)layer)->type = SOFTMAX_LAYER_TYPE;
-    layer->n_neurons = n_neurons;
 
     if (name) {
         snprintf(((struct Layer *)layer)->name, NN_LAYER_NAME_LEN, "%s", name);
@@ -72,6 +70,14 @@ int getSoftmaxLayerOutputNumber(int *n_out, const struct SoftmaxLayer *layer)
     return SUCCESS;
 }
 
+int setSoftmaxLayerNeuronNumber(struct SoftmaxLayer *layer, int n_neurons)
+{
+    CHK_NIL(layer);
+    CHK_ERR((n_neurons > 0)? 0: 1);
+    layer->n_neurons = n_neurons;
+    return SUCCESS;
+}
+
 /**
  * @brief 正向传播, 任务包括：(1)计算当前层线性变换后输出hidden, (2)计算当前层非线性变换后输出output
  */
@@ -79,7 +85,6 @@ int forwardSoftmaxLayer(struct SoftmaxLayer *layer, const struct UpdateArgs *arg
 {
     CHK_NIL(layer);
 
-    //CHK_ERR(activateTensor(((struct Layer *)layer)->output, ((struct Layer *)layer)->input, LOGISTIC));
     CHK_ERR(softmaxTensor(((struct Layer *)layer)->output, ((struct Layer *)layer)->input));
 
     return SUCCESS;

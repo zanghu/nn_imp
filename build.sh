@@ -22,6 +22,7 @@ gcc -g -Wall -O2 \
     $SRC_DIR/layer.c \
     $SRC_DIR/linear_layer.c \
     $SRC_DIR/sigmoid_layer.c \
+    $SRC_DIR/relu_layer.c \
     $SRC_DIR/softmax_layer.c \
     $SRC_DIR/cost.c \
     $SRC_DIR/ce_cost.c \

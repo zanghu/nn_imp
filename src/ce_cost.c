@@ -63,11 +63,12 @@ int forwardCECost(struct CECost *cost, const struct UpdateArgs *args, struct Pro
     if (cost->p == NULL) {
         int b;
         CHK_ERR(getTensorBatch(&b, ((struct Cost *)cost)->input));
-        CHK_ERR(createTensor(&(cost->p), b, 1, ((struct Cost *)cost)->n_input, 1));
+        CHK_ERR(createTensorData(&(cost->p), FLOAT32, b, ((struct Cost *)cost)->n_input));
     }
     CHK_ERR(softmaxTensor(cost->p, ((struct Cost *)cost)->input)); // 计算概率向量y
     if (probe->sw_p_class) {
-        CHK_ERR(copyTensorData(probe->p_class, FLOAT32, cost->p));
+        //CHK_ERR(copyTensorData(probe->p_class, FLOAT32, cost->p));
+        CHK_ERR(getTensorBlobByCopy(probe->p_class, FLOAT32, cost->p));
     }
     return SUCCESS;
 }

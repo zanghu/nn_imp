@@ -93,7 +93,7 @@ void gemm_nn(int M, int N, int K, float ALPHA,
         float *C, int ldc)
 {
     int i,j,k;
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for(i = 0; i < M; ++i){
         for(k = 0; k < K; ++k){
             register float A_PART = ALPHA*A[i*lda+k];
@@ -111,7 +111,7 @@ void gemm_nt(int M, int N, int K, float ALPHA,
         float *C, int ldc)
 {
     int i,j,k;
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for(i = 0; i < M; ++i){
         for(j = 0; j < N; ++j){
             register float sum = 0;
@@ -129,16 +129,44 @@ void gemm_tn(int M, int N, int K, float ALPHA,
         float *B, int ldb,
         float *C, int ldc)
 {
+    //fprintf(stdout, "start gemm_tn++++++++++\n");
     int i,j,k;
-    #pragma omp parallel for
+    //int ant = 0;
+    //int bnt = 0;
+    //int cnt = 0;
+    //int dnt = 0;
+    //#pragma omp parallel for
     for(i = 0; i < M; ++i){
         for(k = 0; k < K; ++k){
             register float A_PART = ALPHA*A[k*lda+i];
+            //if (abs(A_PART) > 0.000000) {
+            //    ++ant;
+            //}
             for(j = 0; j < N; ++j){
                 C[i*ldc+j] += A_PART*B[k*ldb+j];
+                //if (i*ldc+j == 128 * 784) {
+                //    fprintf(stdout, "A[%d] = %f, B[%d] = %f\n", k*lda+i, A_PART, k*ldb+j, B[k*ldb+j]);
+                //}
+                //if (i*ldc+j > 128 * 784) {
+                //    ++cnt;
+                //    if (abs(C[i*ldc+j]) > 0.000000) {
+                //        ++dnt;
+                //    }
+                //    if (abs(B[k*ldb+j]) > 0.000000) {
+                //        ++bnt;
+                //    }
+                //}
             }
         }
     }
+    //if (M == 625 && N == 784) {
+    //    fprintf(stdout, "ant = %d, bnt = %d, cnt = %d, dnt = %d\n", ant, bnt, cnt, dnt);
+    //    fprintf(stdout, "ALPHA = %f\n", ALPHA);
+    //    fprintf(stdout, "M = %d, N = %d, K = %d\n", M, N, K);
+    //    fprintf(stdout, "lda = %d, ldb = %d, ldc = %d\n", lda, ldb, ldc);
+    //    fprintf(stdout, "C[127][0] = %f, C[128][0] = %f\n", C[127 * 784 - 1], C[128 * 784]);
+    //}
+    //fprintf(stdout, "finish gemm_tn----------\n");
 }
 
 // MatMul(A^T, B^T), A is (K, M), B is (K, N)
@@ -148,7 +176,7 @@ void gemm_tt(int M, int N, int K, float ALPHA,
         float *C, int ldc)
 {
     int i,j,k;
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for(i = 0; i < M; ++i){
         for(j = 0; j < N; ++j){
             register float sum = 0;

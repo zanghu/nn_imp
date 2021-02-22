@@ -19,10 +19,9 @@ struct SigmoidLayer
     int n_neurons;
 };
 
-int createSigmoidLayer(struct SigmoidLayer **l, const char *name, int n_neurons)
+int createSigmoidLayer(struct SigmoidLayer **l, const char *name)
 {
     CHK_NIL(l);
-    CHK_ERR((n_neurons > 0)? 0: 1);
 
     struct SigmoidLayer *layer = calloc(1, sizeof(struct SigmoidLayer));
     if (layer == NULL) {
@@ -30,7 +29,6 @@ int createSigmoidLayer(struct SigmoidLayer **l, const char *name, int n_neurons)
         return ERR_COD;
     }
     ((struct Layer *)layer)->type = SIGMOID_LAYER_TYPE;
-    layer->n_neurons = n_neurons;
 
     if (name) {
         snprintf(((struct Layer *)layer)->name, NN_LAYER_NAME_LEN, "%s", name);
@@ -69,6 +67,14 @@ int getSigmoidLayerOutputNumber(int *n_out, const struct SigmoidLayer *layer)
     CHK_NIL(n_out);
     CHK_NIL(layer);
     *n_out = layer->n_neurons;
+    return SUCCESS;
+}
+
+int setSigmoidLayerNeuronNumber(struct SigmoidLayer *layer, int n_neurons)
+{
+    CHK_NIL(layer);
+    CHK_ERR((n_neurons > 0)? 0: 1);
+    layer->n_neurons = n_neurons;
     return SUCCESS;
 }
 

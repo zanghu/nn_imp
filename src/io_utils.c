@@ -48,7 +48,7 @@ int savetxtMatrixFlot32(const char *pth, const float *matrix, int n_samples, int
     }
     CHK_ERR(gettimeofday(&t1, NULL));
     timersub(&t1, &t0, &t2);
-    fprintf(stdout, "savetxtDataFloat32 %s finish, time elapsed: %lu.%06lu.s\n", pth, t2.tv_sec, t2.tv_usec);
+    //fprintf(stdout, "savetxtDataFloat32 %s finish, time elapsed: %lu.%06lu.s\n", pth, t2.tv_sec, t2.tv_usec);
     return SUCCESS;
 
 err_end:
@@ -97,7 +97,7 @@ int savetxtMatrixUint8(const char *pth, const unsigned char *matrix, int n_sampl
     }
     CHK_ERR(gettimeofday(&t1, NULL));
     timersub(&t1, &t0, &t2);
-    fprintf(stdout, "savetxtDataUint8 %s finish, time elapsed: %lu.%06lu.s\n", pth, t2.tv_sec, t2.tv_usec);
+    //fprintf(stdout, "savetxtDataUint8 %s finish, time elapsed: %lu.%06lu.s\n", pth, t2.tv_sec, t2.tv_usec);
 
     return SUCCESS;
 

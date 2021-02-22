@@ -3,6 +3,7 @@
 #include "layer.h"
 #include "linear_layer.h"
 #include "sigmoid_layer.h"
+#include "relu_layer.h"
 #include "softmax_layer.h"
 #include "opt_alg.h"
 #include "probe.h"
@@ -29,6 +30,9 @@ char *getLayerTypeStrFromEnum(enum LayerType type)
         case SIGMOID_LAYER_TYPE:
         return "sigmoid_layer";
 
+        case RELU_LAYER_TYPE:
+        return "relu_layer";
+
         case SOFTMAX_LAYER_TYPE:
         return "softmax_layer";
 
@@ -37,30 +41,6 @@ char *getLayerTypeStrFromEnum(enum LayerType type)
     }
     return "unknow_layer";
 }
-
-/*
-void destroyLayer(struct Layer *layer)
-{
-    if (layer == NULL) return;
-    switch (layer->type) {
-        case LINEAR_LAYER_TYPE:
-        destroyLinearLayer((struct LinearLayer **)layer, n_in, n_out);
-        break;
-
-        case SIGMOID_LAYER_TYPE:
-        destroySigmoidLayer((struct SigmoidLayer **)layer, n_in, n_out);
-        break;
-
-        case SOFTMAX_LAYER_TYPE:
-        destroySoftmaxLayer((struct SoftmaxLayer **)layer, n_in, n_out);
-        break;
-
-        default:
-        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
-        break; // TODO: 此处未抛出异常
-    }
-}
-*/
 
 int forwardLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe *probe)
 {
@@ -73,6 +53,10 @@ int forwardLayer(struct Layer *layer, const struct UpdateArgs *args, struct Prob
 
         case SIGMOID_LAYER_TYPE:
         CHK_ERR(forwardSigmoidLayer((struct SigmoidLayer *)layer, args, probe));
+        break;
+
+        case RELU_LAYER_TYPE:
+        CHK_ERR(forwardReluLayer((struct ReluLayer *)layer, args, probe));
         break;
 
         case SOFTMAX_LAYER_TYPE:
@@ -99,6 +83,10 @@ int backwardLayer(struct Layer *layer, const struct UpdateArgs *args, struct Pro
         CHK_ERR(backwardSigmoidLayer((struct SigmoidLayer *)layer, args, probe));
         break;
 
+        case RELU_LAYER_TYPE:
+        CHK_ERR(backwardReluLayer((struct ReluLayer *)layer, args, probe));
+        break;
+
         case SOFTMAX_LAYER_TYPE:
         CHK_ERR(backwardSoftmaxLayer((struct SoftmaxLayer *)layer, args, probe));
         break;
@@ -120,12 +108,12 @@ int updateLayer(struct Layer *layer, const struct UpdateArgs *args, struct Probe
         break;
 
         case SIGMOID_LAYER_TYPE: // sigmoid_layer无需参数更新，直接略过
-        //ERR_MSG("NotImplementedError, SigmoidLayer has no update method, error.\n");
-        //return ERR_COD;
+        break;
+
+        case RELU_LAYER_TYPE: // relu_layer无需参数更新，直接略过
         break;
 
         case SOFTMAX_LAYER_TYPE: // softmax_layer无需参数更新，直接略过
-        //ERR_MSG("NotImplementedError, SoftmaxLayer has no update method, error.\n");
         break;
 
         default:
@@ -147,14 +135,14 @@ int getLayerShape(int *n_in, int *n_out, const struct Layer *layer)
         break;
 
         case SIGMOID_LAYER_TYPE:
-        //ERR_MSG("sigmoid_layer has no input shape, error.\n");
-        //return ERR_COD;
         CHK_ERR(getSigmoidLayerShape(n_in, n_out, (const struct SigmoidLayer *)layer));
         break;
 
+        case RELU_LAYER_TYPE:
+        CHK_ERR(getReluLayerShape(n_in, n_out, (const struct ReluLayer *)layer));
+        break;
+
         case SOFTMAX_LAYER_TYPE:
-        //ERR_MSG("softmax_layer has no input shape, error.\n");
-        //return ERR_COD;
         CHK_ERR(getSoftmaxLayerShape(n_in, n_out, (const struct SoftmaxLayer *)layer));
         break;
 
@@ -177,6 +165,10 @@ int getLayerInputNumber(int *n_in, const struct Layer *layer)
 
         case SIGMOID_LAYER_TYPE:
         CHK_ERR(getSigmoidLayerInputNumber(n_in, (const struct SigmoidLayer *)layer));
+        break;
+
+        case RELU_LAYER_TYPE:
+        CHK_ERR(getReluLayerInputNumber(n_in, (const struct ReluLayer *)layer));
         break;
 
         case SOFTMAX_LAYER_TYPE:
@@ -204,8 +196,47 @@ int getLayerOutputNumber(int *n_out, const struct Layer *layer)
         CHK_ERR(getSigmoidLayerOutputNumber(n_out, (struct SigmoidLayer *)layer));
         break;
 
+        case RELU_LAYER_TYPE:
+        CHK_ERR(getReluLayerOutputNumber(n_out, (struct ReluLayer *)layer));
+        break;
+
         case SOFTMAX_LAYER_TYPE:
         CHK_ERR(getSoftmaxLayerOutputNumber(n_out, (struct SoftmaxLayer *)layer));
+        break;
+
+        default:
+        ERR_MSG("Unkonw Layer Type found: %s, error.\n", getLayerTypeStrFromEnum(layer->type));
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
+int getLayerName(const char *(*name), const struct Layer *layer)
+{
+    CHK_NIL(name);
+    CHK_NIL(layer);
+    *name = layer->name;
+    return SUCCESS;
+}
+
+int setLayerNeuronNumber(struct Layer *layer, int n_neurons)
+{
+    CHK_NIL(layer);
+
+    switch (layer->type) {
+        case LINEAR_LAYER_TYPE: // 线性层不需要依赖前一层的神经元设置自己的神经元个数
+        break;
+
+        case SIGMOID_LAYER_TYPE:
+        CHK_ERR(setSigmoidLayerNeuronNumber((struct SigmoidLayer *)layer, n_neurons));
+        break;
+
+        case RELU_LAYER_TYPE:
+        CHK_ERR(setReluLayerNeuronNumber((struct ReluLayer *)layer, n_neurons));
+        break;
+
+        case SOFTMAX_LAYER_TYPE:
+        CHK_ERR(setSoftmaxLayerNeuronNumber((struct SoftmaxLayer *)layer, n_neurons));
         break;
 
         default:
@@ -236,7 +267,9 @@ int setLayerInput(struct Layer *layer, const struct Tensor *input)
 {
     CHK_NIL(layer);
     CHK_NIL(input);
-
+    enum TensorType type;
+    CHK_ERR(getTensorType(&type, input));
+    CHK_ERR((type == DATA_TENSOR_TYPE)? 0: 1);
     layer->input = (struct Tensor *)input;
     return SUCCESS;
 }
@@ -245,7 +278,9 @@ int setLayerOutput(struct Layer *layer, const struct Tensor *output)
 {
     CHK_NIL(layer);
     CHK_NIL(output);
-
+    enum TensorType type;
+    CHK_ERR(getTensorType(&type, output));
+    CHK_ERR((type == DATA_TENSOR_TYPE)? 0: 1);
     layer->output = (struct Tensor *)output;
     return SUCCESS;
 }
@@ -254,7 +289,9 @@ int setLayerInputDelta(struct Layer *layer, const struct Tensor *delta_in)
 {
     CHK_NIL(layer);
     CHK_NIL(delta_in);
-
+    enum TensorType type;
+    CHK_ERR(getTensorType(&type, delta_in));
+    CHK_ERR((type == DATA_TENSOR_TYPE)? 0: 1);
     layer->delta_in = (struct Tensor *)delta_in;
     return SUCCESS;
 }
@@ -263,19 +300,9 @@ int setLayerOutputDelta(struct Layer *layer, const struct Tensor *delta_out)
 {
     CHK_NIL(layer);
     CHK_NIL(delta_out);
-
+    enum TensorType type;
+    CHK_ERR(getTensorType(&type, delta_out));
+    CHK_ERR((type == DATA_TENSOR_TYPE)? 0: 1);
     layer->delta_out = (struct Tensor *)delta_out;
     return SUCCESS;
 }
-
-/*
-int setLayerOptAlgArgs(struct Layer *layer, float lr, float momentum)
-{
-    CHK_NIL(layer);
-
-    layer->lr = lr;
-    layer->momentum = momentum;
-
-    return SUCCESS;
-}
-*/
