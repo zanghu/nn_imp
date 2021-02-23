@@ -102,6 +102,24 @@ int getLinearLayerOutputNumber(int *n_out, const struct LinearLayer *layer)
     return SUCCESS;
 }
 
+int loadtxtLinearLayerWeight(struct LinearLayer *layer, const char *pth)
+{
+    CHK_NIL(layer);
+    CHK_NIL(pth);
+    CHK_ERR(loadtxtTensor(layer->w, pth));
+    return SUCCESS;
+}
+
+int loadtxtLinearLayerBias(struct LinearLayer *layer, const char *pth)
+{
+    CHK_NIL(layer);
+    CHK_NIL(pth);
+    //fprintf(stdout, "layer name: %s\n", ((struct Layer *)(layer))->name);
+    CHK_ERR(loadtxtTensor(layer->b, pth));
+    return SUCCESS;
+}
+
+
 /**
  * @brief 正向传播, 计算当前层非线性变换后输出output, 相当于full_connected_layer的隐藏层神经元的值
  */

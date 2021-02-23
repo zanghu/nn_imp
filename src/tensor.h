@@ -32,6 +32,7 @@ int createTensorData(struct Tensor **t, enum DType dtype, int batch_size, int n_
 int createTensorParam(struct Tensor **t, enum DType dtype, int row, int col);
 int createTensorDataWithBlobRef(struct Tensor **t, void *blob, enum DType dtype, int batch_size, int n_features, int n_samples);
 void destroyTensor(struct Tensor *tensor);
+int loadtxtTensor(struct Tensor *tensor, const char *pth);
 int getTensorBlobByCopy(void *dst, enum DType dtype, const struct Tensor *tensor);
 int getTensorRowAndCol(int *row, int *col, const struct Tensor *tensor);
 int getTensorBatchAndFeatures(int *batch_size, int *n_features, const struct Tensor *tensor);

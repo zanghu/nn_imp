@@ -5,12 +5,19 @@ C语言实现的神经网络（Neural Network）
 ## 1.计划
 
 第1阶段：
-实现 MLP、CONV、GAN、LSTM 等基本模型
+实现 MLP、CONV、GAN、BERT 等基本模型
 
 第2阶段：
 分析、研究新的模型和方法
 
 ## 2.进度
+
+### 2021.02.23
+1.增加从numpy.savetxt导出的文件中读取权重作为linear_layer权重的方法；
+
+2.新增功能通过单元测试和集成测试，很神奇的relu层训练390轮（1个完整epoch没有出现inf或nan）；
+
+3.TODO: a.)BUG: epoch最后一个batch运行时报错；b.)BUG: 目前的lr衰减算法有误，会导致衰减系数始终为 1/batch_size，不能根据batch实际大小b_used动态调整。
 
 ### 2021.02.22
 1.增加relu_layer；

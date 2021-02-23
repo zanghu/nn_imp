@@ -25,6 +25,8 @@ void destroyLinearLayer(struct LinearLayer *layer);
 int getLinearLayerShape(int *n_in, int *n_out, const struct LinearLayer *layer);
 int getLinearLayerInputNumber(int *n_in, const struct LinearLayer *layer);
 int getLinearLayerOutputNumber(int *n_out, const struct LinearLayer *layer);
+int loadtxtLinearLayerWeight(struct LinearLayer *layer, const char *pth);
+int loadtxtLinearLayerBias(struct LinearLayer *layer, const char *pth);
 
 int forwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, struct Probe *probe);
 int backwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, struct Probe *probe);

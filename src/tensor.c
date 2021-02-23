@@ -289,6 +289,51 @@ void destroyTensor(struct Tensor *tensor)
     free(tensor);
 }
 
+int loadtxtTensor(struct Tensor *tensor, const char *pth)
+{
+    CHK_NIL(tensor);
+    CHK_NIL(pth);
+
+    int n_samples = 0;
+    int n_features = 0;
+    if (tensor->ttype == DATA_TENSOR_TYPE) {
+        n_samples = tensor->b_used;
+        n_features = tensor->n;
+    } else if (tensor->ttype == PARAM_TENSOR_TYPE) {
+        n_samples = tensor->row;
+        n_features = tensor->col;
+    } else {
+        ERR_MSG("Unknow TensorType: %s, error.\n", getTensorTtypeStrFromEnum(tensor->ttype));
+        return ERR_COD;
+    }
+    //fprintf(stdout, "(n_samples, n_features) = (%d, %d)\n", n_samples, n_features);
+
+    int n_loaded = 0;
+    switch (tensor->dtype) {
+        case FLOAT32:
+        memset(tensor->blob, 0, n_samples * n_features * sizeof(float));
+        tensor->b_used = 0;
+        CHK_ERR(loadtxtBlobFloat32(&n_loaded, pth, tensor->blob, n_samples * n_features));
+        if (n_loaded % n_features != 0) {
+            ERR_MSG("n_load = %d is not integral times of n_features = %d, error.\n", n_loaded, n_features);
+            return ERR_COD;
+        }
+        if (tensor->ttype == DATA_TENSOR_TYPE) {
+            tensor->b_used = n_loaded / n_features;
+        }
+        if (tensor->ttype == PARAM_TENSOR_TYPE && n_loaded != n_features * n_samples) {
+            ERR_MSG("error occured.\n");
+            return ERR_COD;
+        }
+        break;
+
+        default:
+        ERR_MSG("DType: %s not supported yet, error.\n", getTensorDtypeStrFromEnum(tensor->dtype));
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
 int getTensorBlobByCopy(void *dst, enum DType dtype, const struct Tensor *tensor)
 {
     CHK_NIL(dst);

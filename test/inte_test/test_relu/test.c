@@ -36,6 +36,15 @@ int main()
     CHK_ERR(createLinearLayer(&linear_2, "LIN_L2", 128, n_classes));
     struct CECost *ce_cost = NULL;
     CHK_ERR(createCECost(&ce_cost, "CE_COST", 10));
+
+    // 加载参数
+    CHK_ERR(loadtxtLinearLayerWeight(linear_0, "txt/NET_L00_W_784x256.txt"));
+    CHK_ERR(loadtxtLinearLayerBias(linear_0, "txt/NET_L00_b_256.txt"));
+    CHK_ERR(loadtxtLinearLayerWeight(linear_1, "txt/NET_L02_W_256x128.txt"));
+    CHK_ERR(loadtxtLinearLayerBias(linear_1, "txt/NET_L02_b_128.txt"));
+    CHK_ERR(loadtxtLinearLayerWeight(linear_2, "txt/NET_L04_W_128x10.txt"));
+    CHK_ERR(loadtxtLinearLayerBias(linear_2, "txt/NET_L04_b_10.txt"));
+
     printf("layers create finish.\n");
 
     // 创建网络
@@ -75,7 +84,7 @@ int main()
 
     struct timeval t_train_0, t_train_1, t_train_2;
     CHK_ERR(gettimeofday(&t_train_0, NULL));
-    int n_epochs = 1;
+    int n_epochs = 50;
     for (int k = 0; k < n_epochs; ++k) {
         int n_iters = 0;
         args.cur_epoch = k;
@@ -100,9 +109,9 @@ int main()
 
             ++n_iters;
             fprintf(stdout, "finish n_iter = %d, ce_cost = %f\n", n_iters, probe.ce_cost);
-            if (n_iters == 50) {
-                break;
-            }
+            //if (n_iters == 200) {
+            //    break;
+            //}
         }
         CHK_ERR(gettimeofday(&t_epoch_1, NULL));
         timersub(&t_epoch_1, &t_epoch_0, &t_epoch_2);
@@ -113,6 +122,10 @@ int main()
     fprintf(stdout, "train finish, total epochs = %d, time elapsed: %lu.%06lus\n", n_epochs, t_train_2.tv_sec, t_train_2.tv_usec);
 
     // 资源释放
+    freeMnist(&mnist);
+    free(probe.p_class);
+    fprintf(stdout, "mnist free finish\n");
+
     destroyNetwork(net);
     fprintf(stdout, "network destroy finish.\n");
 
@@ -123,10 +136,6 @@ int main()
     destroyLinearLayer(linear_2);
     destroyCECost(ce_cost);
     fprintf(stdout, "layers destroy finish.\n");
-
-    freeMnist(&mnist);
-    free(probe.p_class);
-    fprintf(stdout, "mnist free finish\n");
 
     //CHK_ERR(closeTensorLog());
     fprintf(stdout, "all finish.\n");
