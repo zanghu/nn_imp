@@ -485,6 +485,27 @@ int getTensorBlob(void **blob, struct Tensor *tensor)
     return SUCCESS;
 }
 
+int getTensorBlobConstRef(const void *(*blob), const struct Tensor *tensor)
+{
+    CHK_NIL(blob);
+    CHK_NIL(tensor);
+
+    switch (tensor->dtype) {
+        case FLOAT32:
+        *blob = tensor->blob;
+        break;
+
+        case UINT8:
+        *blob = tensor->blob_u8;
+        break;
+
+        default:
+        ERR_MSG("DType: %s is not supported yet, error.\n", getTensorDtypeStrFromEnum(tensor->dtype));
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
 int setTensorSamplesByReplace(void **blob_old, struct Tensor *tensor, void *blob, int n_samples, int n_features, enum DType dtype)
 {
     CHK_NIL(blob_old);

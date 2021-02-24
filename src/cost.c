@@ -83,6 +83,22 @@ int getCostGroundTruthAttributes(int *n_features, enum DType *dtype, const struc
     return SUCCESS;
 }
 
+int getCostClassProbabilityConstRef(const float *(*p), const struct Cost *cost)
+{
+    CHK_NIL(p);
+    CHK_NIL(cost);
+    switch (cost->type)  {
+        case CE_COST_TYPE:
+        CHK_ERR(getCECostClassProbabilityConstRef(p, (struct CECost *)cost));
+        break;
+
+        default:
+        ERR_MSG("NotImplementedError, error.\n");
+        return ERR_COD;
+    }
+    return SUCCESS;
+}
+
 int setCostName(struct Cost *cost, const char *name)
 {
     CHK_NIL(cost);

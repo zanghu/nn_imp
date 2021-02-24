@@ -13,6 +13,7 @@
 #include "probe.h"
 #include "mnist.h"
 #include "tensor.h"
+#include "math_utils.h"
 #include "debug_macros.h"
 
 #define DATASET_DIR ("/home/zanghu/data_base/mnist")
@@ -92,6 +93,7 @@ int main()
         const void *label_onehot = NULL;
         int n_samples = 0;
         int cum_samples = 0; // 当前epoch累计样本数
+        int n_succ_epoch = 0; // 当前epoch训练集上累计分类成功样本数
         struct timeval t_epoch_0, t_epoch_1, t_epoch_2;
         CHK_ERR(gettimeofday(&t_epoch_0, NULL));
         while (1) {
@@ -110,6 +112,13 @@ int main()
             CHK_ERR(backwardNetwork(net, label_onehot, n_samples, 10, "uint8", &args, &probe));
             CHK_ERR(updateNetwork(net, &args, &probe));
 
+            // 训练集分类成功数统计
+            const float *p = NULL;
+            CHK_ERR(getNetworkClassProbabilityConstRef(&p, net));
+            int n_succ_iter = 0;
+            CHK_ERR(getAccuracyFollowProbilityAndGroundtruth(&n_succ_iter, p, (const unsigned char *)label_onehot, n_samples, n_classes));
+            n_succ_epoch += n_succ_iter;
+
             cum_samples += n_samples;
             ++n_iters;
             fprintf(stdout, "finish n_iter = %d, ce_cost = %f\n", n_iters, probe.ce_cost);
@@ -119,7 +128,7 @@ int main()
         }
         CHK_ERR(gettimeofday(&t_epoch_1, NULL));
         timersub(&t_epoch_1, &t_epoch_0, &t_epoch_2);
-        fprintf(stdout, "epoch %d finish, n_iters = %d, ce_cod = %f, time elapsed: %lu.%06lus\n", k, n_iters, probe.ce_cost, t_epoch_2.tv_sec, t_epoch_2.tv_usec);
+        fprintf(stdout, "epoch %d finish, n_iters = %d, succ_rate = %f, time elapsed: %lu.%06lus\n", k, n_iters, (float)(n_succ_epoch) / (float)(cum_samples), t_epoch_2.tv_sec, t_epoch_2.tv_usec);
     }
     CHK_ERR(gettimeofday(&t_train_1, NULL));
     timersub(&t_train_1, &t_train_0, &t_train_2);

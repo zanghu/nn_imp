@@ -235,6 +235,14 @@ static int checkNetworkInput(struct Network *net, const struct Tensor *input)
     return SUCCESS;
 }
 */
+
+int getNetworkClassProbabilityConstRef(const float *(*p), const struct Network *net)
+{
+    CHK_NIL(p);
+    CHK_NIL(net);
+    CHK_ERR(getCostClassProbabilityConstRef(p, net->cost));
+    return SUCCESS;
+}
  
 int forwardNetwork(struct Network *net, const void *input_data, int n_samples, int n_features, const char *dtype_str, const struct UpdateArgs *args, struct Probe *probe)
 {

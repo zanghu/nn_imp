@@ -57,6 +57,17 @@ int getCECostGroundTruthAttributes(int *n_features, enum DType *dtype, const str
     return SUCCESS;
 }
 
+int getCECostClassProbabilityConstRef(const float *(*p), const struct CECost *cost)
+{
+    CHK_NIL(p);
+    CHK_NIL(cost);
+
+    const void *blob = NULL;
+    CHK_ERR(getTensorBlobConstRef(&blob, cost->p));
+    *p = blob;
+    return SUCCESS;
+}
+
 int forwardCECost(struct CECost *cost, const struct UpdateArgs *args, struct Probe *probe)
 {
     CHK_NIL(cost);

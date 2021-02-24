@@ -44,6 +44,7 @@ int getTensorSamples(int *n_samples, const struct Tensor *tensor);
 int getTensorDType(enum DType *dtype, const struct Tensor *tensor);
 int getTensorType(enum TensorType *ttype, const struct Tensor *tensor);
 int getTensorBlob(void **blob, struct Tensor *tensor);
+int getTensorBlobConstRef(const void *(*blob), const struct Tensor *tensor);
 int setTensorSamplesByReplace(void **blob_old, struct Tensor *tensor, void *blob, int n_samples, int n_features, enum DType dtype);
 
 int activateTensor(struct Tensor *y, const struct Tensor *x, enum ActivationType act_type);

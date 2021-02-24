@@ -27,6 +27,7 @@ struct Cost
 int getCostInputNumber(int *n_in, const struct Cost *cost);
 int getCostValue(float *val, const struct Cost *cost);
 int getCostGroundTruthAttributes(int *n_features, enum DType *dtype, const struct Cost *cost);
+int getCostClassProbabilityConstRef(const float *(*p), const struct Cost *cost);
 int setCostName(struct Cost *cost, const char *name);
 int setCostIndex(struct Cost *cost, int idx);
 int setCostInput(struct Cost *cost, const struct Tensor *input);
