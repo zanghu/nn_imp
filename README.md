@@ -12,6 +12,10 @@ C语言实现的神经网络（Neural Network）
 
 ## 2.进度
 
+### 2021.02.24
+
+1.修复: （1）epoch最后一个batch运行时报错的问题；（2）目前的lr衰减算法有误，会导致衰减系数始终为 1/batch_size，不能根据batch实际大小b_used动态调整。
+
 ### 2021.02.23
 1.增加从numpy.savetxt导出的文件中读取权重作为linear_layer权重的方法；
 

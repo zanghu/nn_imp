@@ -494,7 +494,8 @@ int setTensorSamplesByReplace(void **blob_old, struct Tensor *tensor, void *blob
     CHK_ERR((n_features > 0)? 0: 1);
     CHK_ERR((tensor->dtype == dtype)? 0: 1);
     CHK_ERR((tensor->ttype == DATA_TENSOR_TYPE)? 0: 1);
-    CHK_ERR((n_samples <= tensor->b)? 0: 1);
+    //fprintf(stdout, "n_samples = %d, tensor->b = %d\n", n_samples, tensor->b);
+    //CHK_ERR((n_samples <= tensor->b)? 0: 1); 此项无需检查，因为是直接替换blob而不是向blob拷贝，加入该检查后回到值epoch切换时报错（因为上一个epoch最后一个batch缩小了blob）
     CHK_ERR((n_features == tensor->n)? 0: 1);
 
     void *tmp = NULL;
@@ -734,12 +735,14 @@ int linearTensorBiasGradient(struct Tensor *z, const struct Tensor *x)
 // x = x + lr * y
 // y = momentum * (lr * y), 动量法，保存用作下一轮使用
 // 该方法专门为参数更新准备，因此不涉及tensor->b和tensor->n
+//int addTensor(struct Tensor *x, struct Tensor *y, float lr, int n_samples, float momentum)
 int addTensor(struct Tensor *x, struct Tensor *y, float lr, float momentum)
 {
     CHK_NIL(x);
     CHK_NIL(y);
     CHK_ERR((x->ttype == PARAM_TENSOR_TYPE)? 0: 1);
     CHK_ERR((y->ttype == PARAM_TENSOR_TYPE)? 0: 1);
+    //CHK_ERR((n_samples >0)? 0: 1);
 
     // STEP 0: prepare
     //lr *= -1;
@@ -751,6 +754,7 @@ int addTensor(struct Tensor *x, struct Tensor *y, float lr, float momentum)
     // STEP 1: y = lr * y
     int i = 0;
     for (i = 0; i < n; ++i) {
+        //(y->blob[i]) /= n_samples;
         (y->blob[i]) *= lr;
     }
 
@@ -820,7 +824,7 @@ int addTensor2(struct Tensor *delta, const struct Tensor *y, const struct Tensor
     switch (gt->dtype) {
         case UINT8:
         for (i = 0; i < n_elems; ++i) {
-            delta->blob[i] = gt->blob_u8[i] - y->blob[i];
+            delta->blob[i] = (gt->blob_u8[i] - y->blob[i]) / (float)(gt->b_used); // 学习速率关于每个batch的样本数降低的计算，统一放在代价函数里，不需要放在每一层的update里
         }
         break;
 

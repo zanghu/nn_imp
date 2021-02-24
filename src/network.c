@@ -260,6 +260,7 @@ int forwardNetwork(struct Network *net, const void *input_data, int n_samples, i
         CHK_ERR(setTensorSamplesByReplace(&blob_old, net->input, (void *)input_data, n_samples, n_features, dtype));
     }
     else {
+        //fprintf(stdout, "create input Tensor...\n");
         int n_in;
         CHK_ERR(getLayerInputNumber(&n_in, net->layers[0]));
         CHK_ERR(createTensorDataWithBlobRef(&(net->input), (void *)input_data, dtype, args->batch_size, n_features, n_samples));

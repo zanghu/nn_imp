@@ -53,6 +53,7 @@ int linearTensorBackward(struct Tensor *z, const struct Tensor *x, const struct 
 int linearTensorWeightGradient(struct Tensor *z, const struct Tensor *x, const struct Tensor *y);
 int linearTensorBiasGradient(struct Tensor *z, const struct Tensor *x);
 int addTensor(struct Tensor *x, struct Tensor *y, float lr, float momentum);
+//int addTensor(struct Tensor *x, struct Tensor *y, float lr, int n_samples, float momentum);
 int softmaxTensor(struct Tensor *output, const struct Tensor *input);
 int addTensor2(struct Tensor *delta, const struct Tensor *y, const struct Tensor *gt);
 int probTensor(float *val, const struct Tensor *p, const struct Tensor *gt);

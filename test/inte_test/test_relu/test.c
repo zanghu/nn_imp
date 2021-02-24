@@ -53,7 +53,7 @@ int main()
     args.batch_size = 128;
     args.lr = 0.001;
     args.momentum = 0.0; // 不使用动量法
-    args.n_epochs = 100; // 最大循环数
+    args.n_epochs = 50; // 最大循环数
     struct Network *net = NULL;
     CHK_ERR(createNetwork(&net, layers, 5, (struct Cost *)ce_cost));
     printf("network create finish.\n");
@@ -91,6 +91,7 @@ int main()
         const void *data_batch = NULL;
         const void *label_onehot = NULL;
         int n_samples = 0;
+        int cum_samples = 0; // 当前epoch累计样本数
         struct timeval t_epoch_0, t_epoch_1, t_epoch_2;
         CHK_ERR(gettimeofday(&t_epoch_0, NULL));
         while (1) {
@@ -98,15 +99,18 @@ int main()
             // 获取batch数据
             CHK_ERR(getMnistNthBatch((const float *(*))(&data_batch), (const unsigned char *(*))(&label_onehot), &n_samples, "train", &mnist, n_train, args.batch_size, n_iters));
             if (data_batch == NULL) { // 训练集全部使用了一轮, 当前epoch结束
-                fprintf(stdout, "n_iters = %d, data_batch is NULL\n", n_iters);
+                fprintf(stdout, "n_iters = %d, data_batch is NULL, epoch %d finish...\n", n_iters, k);
                 break;
             }
+            args.cur_samples = n_samples;
+            fprintf(stdout, "epoch = %d, iter = %d, n_samples = %d, cumulative samples: %d\n", k, n_iters, n_samples, cum_samples);
 
             // 训练
             CHK_ERR(forwardNetwork(net, data_batch, n_samples, 28 * 28, "float32", &args, &probe));
             CHK_ERR(backwardNetwork(net, label_onehot, n_samples, 10, "uint8", &args, &probe));
             CHK_ERR(updateNetwork(net, &args, &probe));
 
+            cum_samples += n_samples;
             ++n_iters;
             fprintf(stdout, "finish n_iter = %d, ce_cost = %f\n", n_iters, probe.ce_cost);
             //if (n_iters == 200) {

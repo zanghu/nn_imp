@@ -196,11 +196,13 @@ int updateLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args, 
     logTensorStr("\n");
 */
     // 注意：这里的lr应该是已经除以了batch_size后的lr
-    CHK_ERR(addTensor(layer->w, layer->w_grad, 1. * (args->lr) / (args->batch_size), args->momentum));
+    //CHK_ERR(addTensor(layer->w, layer->w_grad, 1. * (args->lr) / (args->batch_size), args->momentum));
+    CHK_ERR(addTensor(layer->w, layer->w_grad, 1. * (args->lr), args->momentum));
     if (probe->dump_w) {
         CHK_ERR(savetxtTensorParam(layer->w, probe->dst_dir, "W", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
     }
-    CHK_ERR(addTensor(layer->b, layer->b_grad, 1. * (args->lr) / (args->batch_size), args->momentum));
+    //CHK_ERR(addTensor(layer->b, layer->b_grad, 1. * (args->lr) / (args->batch_size), args->momentum));
+    CHK_ERR(addTensor(layer->b, layer->b_grad, 1. * (args->lr), args->momentum));
     if (probe->dump_b) {
         CHK_ERR(savetxtTensorParam(layer->b, probe->dst_dir, "b", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
     }
