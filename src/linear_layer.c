@@ -130,7 +130,7 @@ int forwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args,
     CHK_ERR(linearTensorForward(((struct Layer *)layer)->output, ((struct Layer *)layer)->input, layer->w, layer->b));
 
     if (probe->dump_output) {
-        CHK_ERR(savetxtTensorData(((struct Layer *)layer)->output, probe->dst_dir, "output", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
+        CHK_ERR(savetxtTensorData(((struct Layer *)layer)->output, probe->dst_dir, "out", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
     }
 
     return SUCCESS;
@@ -148,7 +148,7 @@ int backwardLinearLayer(struct LinearLayer *layer, const struct UpdateArgs *args
         CHK_ERR(linearTensorBackward(((struct Layer *)layer)->delta_out, ((struct Layer *)layer)->delta_in, layer->w));
 
         if (probe->dump_delta) {
-            CHK_ERR(savetxtTensorData(((struct Layer *)layer)->delta_out, probe->dst_dir, "delta", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
+            CHK_ERR(savetxtTensorData(((struct Layer *)layer)->delta_in, probe->dst_dir, "delta", ((struct Layer *)layer)->name, args->cur_epoch, args->cur_iter));
         }
     }
     //if ((((struct Layer *)layer)->delta_out)) {

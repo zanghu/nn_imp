@@ -26,17 +26,17 @@ int main()
 
     // 创建组件
     struct LinearLayer *linear_0 = NULL;
-    CHK_ERR(createLinearLayer(&linear_0, "LIN_L0", n_features, 256));
+    CHK_ERR(createLinearLayer(&linear_0, "L0_LIN", n_features, 256));
     struct ReluLayer *relu_0 = NULL;
-    CHK_ERR(createReluLayer(&relu_0, "RELU_L0"));
+    CHK_ERR(createReluLayer(&relu_0, "L0_RELU"));
     struct LinearLayer *linear_1 = NULL;
-    CHK_ERR(createLinearLayer(&linear_1, "LIN_L1", 256, 128));
+    CHK_ERR(createLinearLayer(&linear_1, "L1_LIN", 256, 128));
     struct ReluLayer *relu_1 = NULL;
-    CHK_ERR(createReluLayer(&relu_1, "RELU_L1"));
+    CHK_ERR(createReluLayer(&relu_1, "L1_RELU"));
     struct LinearLayer *linear_2 = NULL;
-    CHK_ERR(createLinearLayer(&linear_2, "LIN_L2", 128, n_classes));
+    CHK_ERR(createLinearLayer(&linear_2, "L2_LIN", 128, n_classes));
     struct CECost *ce_cost = NULL;
-    CHK_ERR(createCECost(&ce_cost, "CE_COST", 10));
+    CHK_ERR(createCECost(&ce_cost, "COST_CE", 10));
 
     // 加载参数
     CHK_ERR(loadtxtLinearLayerWeight(linear_0, "txt/NET_L00_W_784x256.txt"));
@@ -76,16 +76,16 @@ int main()
     probe.sw_ce_cost = 1;
 
     probe.dst_dir = "txt";
-    //probe.dump_w = 1; // 导出层的参数
-    //probe.dump_b = 1; // 导出层的参数
-    //probe.dump_gw = 1; // 导出层的梯度
-    //probe.dump_gb = 1; // 导出层的梯度
-    //probe.dump_output = 1; // 导出层的输出
-    //probe.dump_delta = 1; // 导出层的灵敏度
+    probe.dump_w = 1; // 导出层的参数
+    probe.dump_b = 1; // 导出层的参数
+    probe.dump_gw = 1; // 导出层的梯度
+    probe.dump_gb = 1; // 导出层的梯度
+    probe.dump_output = 1; // 导出层的输出
+    probe.dump_delta = 1; // 导出层的灵敏度
 
     struct timeval t_train_0, t_train_1, t_train_2;
     CHK_ERR(gettimeofday(&t_train_0, NULL));
-    int n_epochs = 50;
+    int n_epochs = 1;
     for (int k = 0; k < n_epochs; ++k) {
         int n_iters = 0;
         args.cur_epoch = k;
@@ -122,9 +122,9 @@ int main()
             cum_samples += n_samples;
             ++n_iters;
             fprintf(stdout, "finish n_iter = %d, ce_cost = %f\n", n_iters, probe.ce_cost);
-            //if (n_iters == 200) {
-            //    break;
-            //}
+            if (n_iters == 2) {
+                break;
+            }
         }
         CHK_ERR(gettimeofday(&t_epoch_1, NULL));
         timersub(&t_epoch_1, &t_epoch_0, &t_epoch_2);

@@ -44,5 +44,6 @@ int getAccuracyFollowProbilityAndGroundtruth(int *n_success, const float *p, con
         }
     }
     *n_success = n_succ;
+    
     return SUCCESS;
 }
